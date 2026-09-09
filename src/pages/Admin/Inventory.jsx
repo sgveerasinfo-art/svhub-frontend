@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { useAdminStore } from '../../context/AdminStore.jsx'
+import { useEffect, useMemo, useState } from 'react'
+import { getAdminProducts, updateAdminInventory } from '../../api/adminProducts.js'
 import { useAdminUi, usePagedList } from '../../context/AdminUi.jsx'
 import { ADMIN_PAGE_SIZE, STOREFRONTS, matchesQuery } from '../../data/admin.js'
 import {
@@ -20,13 +20,32 @@ import {
 } from '../../components/admin/ui.jsx'
 
 function Inventory() {
-  const { ready, products, adjustInventory } = useAdminStore()
   const { toast } = useAdminUi()
+  const [products, setProducts] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [refreshIndex, setRefreshIndex] = useState(0)
   const [query, setQuery] = useState('')
   const [house, setHouse] = useState('all')
   const [stock, setStock] = useState('all')
   const [editing, setEditing] = useState(null)
   const [qty, setQty] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    getAdminProducts({ limit: 100 })
+      .then((res) => {
+        if (cancelled) return
+        setProducts(res.data || [])
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [refreshIndex])
 
   const filtered = useMemo(() => {
     return products
@@ -43,14 +62,30 @@ function Inventory() {
     setQty(String(product.qty))
   }
 
-  function saveAdjust(event) {
+  async function saveAdjust(event) {
     event.preventDefault()
-    adjustInventory(editing.id, qty)
-    toast.success(`Stock updated for ${editing.name}`)
-    setEditing(null)
+    const newQty = Math.max(0, parseInt(qty, 10) || 0)
+    try {
+      await updateAdminInventory(editing.id || editing._id, { qty: newQty })
+      setProducts((prev) =>
+        prev.map((p) =>
+          p.id === editing.id
+            ? {
+                ...p,
+                qty: newQty,
+                stock: newQty > 10 ? 'in-stock' : newQty > 0 ? 'low-stock' : 'out-of-stock',
+              }
+            : p
+        )
+      )
+      toast.success(`Stock updated for ${editing.name}`)
+      setEditing(null)
+    } catch (err) {
+      toast.error(err.message || 'Could not update stock')
+    }
   }
 
-  if (!ready) return <LoadingState label="Loading inventory" />
+  if (loading) return <LoadingState label="Loading inventory" />
 
   const columns = [
     {

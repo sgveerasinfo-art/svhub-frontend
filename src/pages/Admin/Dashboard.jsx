@@ -1,14 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { useAdminStore } from '../../context/AdminStore.jsx'
-import {
-  ORDER_STATUSES,
-  dayKey,
-  formatAdminDate,
-  lastNDays,
-  revenueOf,
-  storefrontLabel,
-} from '../../data/admin.js'
+import { getAdminDashboard } from '../../api/adminDashboard.js'
+import { formatAdminDate, storefrontLabel } from '../../data/admin.js'
 import { formatPrice } from '../../utils/money.js'
 import { Icon } from '../../components/admin/icons.jsx'
 import {
@@ -19,27 +12,17 @@ import {
   Thumb,
 } from '../../components/admin/ui.jsx'
 
-function mostOrderedName(orders) {
-  const counts = new Map()
-  orders.forEach((order) => {
-    if (order.status === 'Cancelled') return
-    order.items?.forEach((item) => {
-      counts.set(item.name, (counts.get(item.name) || 0) + (item.quantity || 1))
-    })
-  })
-  return [...counts.entries()].sort((a, b) => b[1] - a[1])[0] || null
-}
-
-function SalesChart({ points }) {
+function SalesChart({ points = [] }) {
   const [hover, setHover] = useState(null)
   const width = 560
   const height = 196
   const pad = { top: 16, right: 12, bottom: 28, left: 12 }
   const innerW = width - pad.left - pad.right
   const innerH = height - pad.top - pad.bottom
-  const max = Math.max(...points.map((point) => point.total), 1)
-  const coords = points.map((point, index) => {
-    const x = pad.left + (points.length === 1 ? innerW / 2 : (index / (points.length - 1)) * innerW)
+  const safePoints = points.length ? points : [{ label: 'Today', total: 0 }]
+  const max = Math.max(...safePoints.map((point) => point.total), 1)
+  const coords = safePoints.map((point, index) => {
+    const x = pad.left + (safePoints.length === 1 ? innerW / 2 : (index / (safePoints.length - 1)) * innerW)
     const y = pad.top + innerH - (point.total / max) * innerH
     return { ...point, x, y }
   })
@@ -114,72 +97,59 @@ function DashboardSkeleton() {
 }
 
 function Dashboard() {
-  const { ready, bootError, orders, products, customers, resetStore } = useAdminStore()
   const navigate = useNavigate()
   const [range, setRange] = useState(7)
   const [tick, setTick] = useState(0)
+  const [data, setData] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
-  const view = useMemo(() => {
-    const pendingOrders = orders.filter((order) => order.status === 'Pending')
-    const lowStock = [...products]
-      .filter((product) => product.stock === 'low-stock' || product.stock === 'out-of-stock')
-      .sort((a, b) => a.qty - b.qty)
-    const revenue = revenueOf(orders)
-    const recent = [...orders].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 6)
-    const statusRows = ORDER_STATUSES.map((status) => ({
-      status,
-      count: orders.filter((order) => order.status === status).length,
-    }))
-    const days = lastNDays(range)
-    const byDay = days.map((date) => {
-      const key = dayKey(date)
-      return {
-        label:
-          range === 7
-            ? date.toLocaleDateString('en-GB', { weekday: 'short' })
-            : date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }),
-        total: revenueOf(orders.filter((order) => dayKey(order.date) === key)),
-      }
-    })
-    const sampled =
-      range === 7
-        ? byDay
-        : byDay.filter((_, index) => index % Math.ceil(byDay.length / 8) === 0 || index === byDay.length - 1)
-    const nutri = revenueOf(orders.filter((order) => order.storefronts?.includes('nutri-hub')))
-    const care = revenueOf(orders.filter((order) => order.storefronts?.includes('self-care')))
-    const topItem = mostOrderedName(orders)
-    const lowest = [...products].sort((a, b) => a.qty - b.qty)[0] || null
-    const topHouse = nutri >= care ? { id: 'nutri-hub', value: nutri } : { id: 'self-care', value: care }
-
-    return {
-      pendingOrders,
-      lowStock,
-      revenue,
-      recent,
-      statusRows,
-      sampled,
-      nutri,
-      care,
-      topItem,
-      lowest,
-      topHouse,
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    setError('')
+    getAdminDashboard({ range })
+      .then((res) => {
+        if (cancelled) return
+        setData(res.data)
+      })
+      .catch((err) => {
+        if (cancelled) return
+        setError(err.message || 'Could not load admin dashboard data.')
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
     }
-  }, [orders, products, range, tick])
+  }, [range, tick])
 
-  if (!ready) return <DashboardSkeleton />
-  if (bootError) {
-    return <ErrorState title="Could not load admin data" copy={bootError} onRetry={resetStore} />
+  if (loading && !data) return <DashboardSkeleton />
+  if (error && !data) {
+    return <ErrorState title="Could not load admin data" copy={error} onRetry={() => setTick((v) => v + 1)} />
   }
 
-  const { pendingOrders, lowStock, revenue, recent, statusRows, sampled, nutri, care, topItem, lowest, topHouse } = view
-  const orderTotal = orders.length || 1
+  const metricsData = data?.metrics || {}
+  const pendingOrders = metricsData.pendingOrders ?? 0
+  const lowStock = data?.lowStockProducts || []
+  const revenue = metricsData.revenue ?? 0
+  const recent = data?.recentOrders || []
+  const statusRows = data?.statusRows || []
+  const sampled = data?.salesChart || []
+  const nutri = data?.nutriRevenue ?? 0
+  const care = data?.careRevenue ?? 0
+  const topItem = data?.topItem || null
+  const lowest = data?.lowestProduct || null
+  const topHouse = data?.topHouse || { id: 'nutri-hub', value: 0 }
+  const orderTotal = metricsData.totalOrders || 1
 
   const metrics = [
-    { key: 'products', label: 'Total Products', value: products.length, hint: 'Live catalogue', to: '/admin/products', tone: 'calm' },
-    { key: 'orders', label: 'Total Orders', value: orders.length, hint: 'Across all orders', to: '/admin/orders', tone: 'calm' },
-    { key: 'pending', label: 'Pending Orders', value: pendingOrders.length, hint: 'Awaiting action', to: '/admin/orders?status=Pending', tone: 'amber' },
+    { key: 'products', label: 'Total Products', value: metricsData.totalProducts ?? 0, hint: 'Live catalogue', to: '/admin/products', tone: 'calm' },
+    { key: 'orders', label: 'Total Orders', value: metricsData.totalOrders ?? 0, hint: 'Across all orders', to: '/admin/orders', tone: 'calm' },
+    { key: 'pending', label: 'Pending Orders', value: pendingOrders, hint: 'Awaiting action', to: '/admin/orders?status=Pending', tone: 'amber' },
     { key: 'revenue', label: 'Revenue', value: formatPrice(revenue), hint: 'Paid orders', to: '/admin/orders?payment=Paid', tone: 'lead' },
-    { key: 'customers', label: 'Customers', value: customers.length, hint: 'On file', to: '/admin/customers', tone: 'calm' },
+    { key: 'customers', label: 'Customers', value: metricsData.totalCustomers ?? 0, hint: 'On file', to: '/admin/customers', tone: 'calm' },
     { key: 'stock', label: 'Low Stock', value: lowStock.length, hint: 'Need restock', to: '/admin/products?stock=alert', tone: 'alert' },
   ]
 
@@ -320,7 +290,7 @@ function Dashboard() {
         <article className="admin-surface">
           <div className="admin-surface__head">
             <div>
-              <p className="admin-surface__kicker">{orders.length} total orders</p>
+              <p className="admin-surface__kicker">{metricsData.totalOrders ?? 0} total orders</p>
               <h2>Order Activity</h2>
             </div>
           </div>

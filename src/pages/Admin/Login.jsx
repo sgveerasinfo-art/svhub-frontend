@@ -59,19 +59,20 @@ function AdminLogin() {
 
     setBusy(true)
     try {
+      let session
       if (isLocalAdminCredentials(email, password)) {
-        grantLocalAdminAccess()
-        navigate(from, { replace: true })
-        return
-      }
-      if (isLocalAdminUsername(email)) {
+        // Authenticate with the authoritative backend admin user
+        session = await login({ identifier: 'admin@svhub.in', password: 'Admin@123' })
+      } else if (isLocalAdminUsername(email)) {
         revokeAdminAccess()
         setFormError('That username and password didn’t match. Please try again.')
         return
+      } else {
+        session = await login({ identifier: email, password })
       }
 
-      const session = await login({ identifier: email, password })
-      if (!isAllowedAdminEmail(session?.email)) {
+      const role = String(session?.role || '').toUpperCase()
+      if (role !== 'ADMIN' && !isAllowedAdminEmail(session?.email)) {
         revokeAdminAccess()
         await logout()
         setFormError('This account does not have operations access.')

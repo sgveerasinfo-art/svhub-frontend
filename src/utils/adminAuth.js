@@ -69,12 +69,10 @@ export function revokeAdminAccess() {
 }
 
 export function hasAdminAccess(user) {
+  if (!user) return false
+  if (String(user.role || '').toUpperCase() === 'ADMIN') return true
   const gate = readAdminGate()
   if (!gate) return false
-  if (gate.kind === 'local' && normalizeAdminIdentifier(gate.email) === LOCAL_ADMIN_USER) {
-    return true
-  }
-  if (!user) return false
   if (gate.email && user.email && gate.email.toLowerCase() !== String(user.email).toLowerCase()) {
     return false
   }

@@ -1,10 +1,13 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { useAdminStore } from '../../context/AdminStore.jsx'
+import {
+  getAdminCustomers,
+  getAdminCustomer,
+  updateAdminCustomer,
+} from '../../api/adminCustomers.js'
 import { useAdminUi, usePagedList } from '../../context/AdminUi.jsx'
 import {
   ADMIN_PAGE_SIZE,
-  customerStats,
   formatAdminDate,
   formatAdminDateTime,
   matchesQuery,
@@ -15,6 +18,7 @@ import {
   AdminButton,
   ConfirmDialog,
   EmptyState,
+  ErrorState,
   LoadingState,
   Pagination,
   SearchInput,
@@ -22,7 +26,9 @@ import {
 import './Customers.css'
 
 export default function AdminCustomers() {
-  const { ready, customers, orders, updateCustomer } = useAdminStore()
+  const [customers, setCustomers] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
   const { toast } = useAdminUi()
   const [params, setParams] = useSearchParams()
 
@@ -73,27 +79,58 @@ export default function AdminCustomers() {
     })
   }
 
+  const fetchCustomers = useCallback(() => {
+    let cancelled = false
+    setLoading(true)
+    setError('')
+    getAdminCustomers({
+      q: searchQuery,
+      status: statusFilter,
+      tier: tierFilter,
+      sort: sortKey,
+      dir: sortDir,
+      limit: 100,
+    })
+      .then((res) => {
+        if (cancelled) return
+        setCustomers(res.data || [])
+      })
+      .catch((err) => {
+        if (cancelled) return
+        setError(err.message || 'Could not load customer directory.')
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [searchQuery, statusFilter, tierFilter, sortKey, sortDir])
+
+  useEffect(() => {
+    const cleanup = fetchCustomers()
+    return cleanup
+  }, [fetchCustomers])
+
   // Process rows with stats, search, filter, and sort
   const allEnrichedCustomers = useMemo(() => {
     if (!customers || !customers.length) return []
-    return customers.map((c) => {
-      const stats = customerStats(c, orders || [])
-      return {
-        ...c,
-        status: c.status || 'Active',
-        orderCount: stats.orderCount || 0,
-        spent: stats.spent || 0,
-        lastOrder: stats.lastOrder || null,
-        lastOrderId: stats.lastOrderId || null,
-      }
-    })
-  }, [customers, orders])
+    return customers.map((c) => ({
+      ...c,
+      id: c.id || c._id,
+      status: c.status || 'Active',
+      orderCount: c.orderCount || 0,
+      spent: c.spent || 0,
+      lastOrder: c.lastOrder || null,
+      lastOrderId: c.lastOrderId || null,
+    }))
+  }, [customers])
 
   // Aggregate KPI summary
   const summaryKpis = useMemo(() => {
     const total = allEnrichedCustomers.length
-    const active = allEnrichedCustomers.filter((c) => c.status !== 'Inactive').length
-    const totalRevenue = allEnrichedCustomers.reduce((acc, c) => acc + c.spent, 0)
+    const active = allEnrichedCustomers.filter((c) => (c.status || '').toUpperCase() !== 'INACTIVE').length
+    const totalRevenue = allEnrichedCustomers.reduce((acc, c) => acc + (c.spent || 0), 0)
     const repeatBuyers = allEnrichedCustomers.filter((c) => c.orderCount >= 2).length
     const repeatRate = total ? Math.round((repeatBuyers / total) * 100) : 0
     return { total, active, totalRevenue, repeatRate }
@@ -124,10 +161,10 @@ export default function AdminCustomers() {
       .sort((a, b) => {
         let modifier = sortDir === 'asc' ? 1 : -1
         if (sortKey === 'name') {
-          return a.name.localeCompare(b.name) * modifier
+          return (a.name || '').localeCompare(b.name || '') * modifier
         }
         if (sortKey === 'joined') {
-          return (new Date(a.joined).getTime() - new Date(b.joined).getTime()) * modifier
+          return (new Date(a.joined || a.createdAt).getTime() - new Date(b.joined || b.createdAt).getTime()) * modifier
         }
         if (sortKey === 'orders') {
           return (a.orderCount - b.orderCount) * modifier
@@ -147,15 +184,13 @@ export default function AdminCustomers() {
 
   // Orders for selected customer
   const customerOrders = useMemo(() => {
-    if (!selectedCustomer || !orders) return []
-    return orders
-      .filter((o) => o.customerId === selectedCustomer.id)
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-  }, [selectedCustomer, orders])
+    if (!selectedCustomer) return []
+    return selectedCustomer.orders || []
+  }, [selectedCustomer])
 
   const hasActiveFilters = searchQuery || statusFilter !== 'all' || tierFilter !== 'all'
 
-  if (!ready) {
+  if (loading) {
     return (
       <div className="admin-customers-page">
         <LoadingState label="Loading customer directory..." lines={8} />
@@ -163,38 +198,75 @@ export default function AdminCustomers() {
     )
   }
 
-  function openCustomerDetail(customer) {
+  if (error) {
+    return (
+      <div className="admin-customers-page">
+        <ErrorState
+          title="Could not load customer directory"
+          copy={error}
+          onRetry={fetchCustomers}
+        />
+      </div>
+    )
+  }
+
+  async function openCustomerDetail(customer) {
     setSelectedCustomer(customer)
     setNotesInput(customer.notes || '')
+    try {
+      const res = await getAdminCustomer(customer.id || customer._id)
+      if (res.data) {
+        setSelectedCustomer((prev) => (prev && (prev.id === customer.id || prev._id === customer._id) ? { ...prev, ...res.data } : prev))
+        setNotesInput(res.data.notes || '')
+      }
+    } catch {
+      // Keep basic customer data loaded from list if detail fetch fails
+    }
   }
 
   function handleStatusChange(targetStatus) {
     if (!selectedCustomer) return
-    if (targetStatus === 'Inactive') {
+    if (targetStatus.toLowerCase() === 'inactive') {
       setConfirmDeactivate({ targetStatus, customer: selectedCustomer })
       return
     }
     applyCustomerStatus(targetStatus)
   }
 
-  function applyCustomerStatus(status) {
+  async function applyCustomerStatus(status) {
     if (!selectedCustomer) return
-    updateCustomer(selectedCustomer.id, { status })
-    setSelectedCustomer((prev) => (prev ? { ...prev, status } : null))
-    toast.success(`Account status for ${selectedCustomer.name} updated to ${status}`)
-    setConfirmDeactivate(null)
+    const custId = selectedCustomer.id || selectedCustomer._id
+    try {
+      await updateAdminCustomer(custId, { status })
+      setSelectedCustomer((prev) => (prev ? { ...prev, status } : null))
+      setCustomers((prev) =>
+        prev.map((c) => ((c.id || c._id) === custId ? { ...c, status } : c)),
+      )
+      toast.success(`Account status for ${selectedCustomer.name} updated to ${status}`)
+    } catch (err) {
+      toast.error(err.message || 'Could not update account status')
+    } finally {
+      setConfirmDeactivate(null)
+    }
   }
 
-  function handleSaveNotes(e) {
+  async function handleSaveNotes(e) {
     e.preventDefault()
     if (!selectedCustomer) return
+    const custId = selectedCustomer.id || selectedCustomer._id
     setSavingNotes(true)
-    updateCustomer(selectedCustomer.id, { notes: notesInput })
-    setTimeout(() => {
-      setSavingNotes(false)
+    try {
+      await updateAdminCustomer(custId, { notes: notesInput })
       setSelectedCustomer((prev) => (prev ? { ...prev, notes: notesInput } : null))
+      setCustomers((prev) =>
+        prev.map((c) => ((c.id || c._id) === custId ? { ...c, notes: notesInput } : c)),
+      )
       toast.success('Customer notes saved')
-    }, 200)
+    } catch (err) {
+      toast.error(err.message || 'Could not save customer notes')
+    } finally {
+      setSavingNotes(false)
+    }
   }
 
   return (

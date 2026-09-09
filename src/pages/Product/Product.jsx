@@ -249,12 +249,11 @@ function Product() {
   if (loading) return <ProductLoading />
   if (notFound || !product) return <ProductNotFound />
 
-  const [recent] = useState(() => readViewed(product.id, 4))
-
-  return <ProductView key={product.id} product={product} related={related} recent={recent} />
+  return <ProductView key={product.id} product={product} related={related} />
 }
 
-function ProductView({ product, related, recent }) {
+function ProductView({ product, related }) {
+  const [recent] = useState(() => readViewed(product.id, 4))
   const navigate = useNavigate()
   const { addItem, setItemQuantity, quantityOf, items } = useCart()
   const [variantId, setVariantId] = useState(product.variants[0]?.id ?? '')

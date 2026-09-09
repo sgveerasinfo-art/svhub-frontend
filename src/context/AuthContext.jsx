@@ -3,14 +3,11 @@ import { onAuthStateChanged } from 'firebase/auth'
 import * as authApi from '../api/auth.js'
 import { getFirebaseAuth } from '../lib/firebase.js'
 import { mapFirebaseError, signInWithGooglePopup, signOutFirebase } from '../lib/googleAuth.js'
-import { useCart } from './CartContext.jsx'
-
 const AuthContext = createContext(null)
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => authApi.readSession())
   const exchanging = useRef(false)
-  const { items: cartItems, clearCart, mergeGuestCart } = useCart()
 
   const applySession = useCallback((session) => {
     setUser(session)
@@ -26,28 +23,24 @@ export function AuthProvider({ children }) {
   )
 
   const login = useCallback(async (payload) => {
-    const guestItems = cartItems.slice()
     const session = await authApi.login(payload)
     applySession(session)
-    mergeGuestCart(guestItems)
     return session
-  }, [applySession, cartItems, mergeGuestCart])
+  }, [applySession])
 
   const loginWithGoogle = useCallback(async () => {
     exchanging.current = true
-    const guestItems = cartItems.slice()
     try {
       const idToken = await signInWithGooglePopup()
       const result = await authApi.loginWithGoogle(idToken)
       applySession(result.user)
-      mergeGuestCart(guestItems)
       return result
     } catch (error) {
       throw mapFirebaseError(error)
     } finally {
       exchanging.current = false
     }
-  }, [applySession, cartItems, mergeGuestCart])
+  }, [applySession])
 
   const register = useCallback(async (payload) => {
     return authApi.register(payload)
@@ -67,13 +60,12 @@ export function AuthProvider({ children }) {
   const logout = useCallback(async () => {
     authApi.logout()
     setUser(null)
-    clearCart()
     try {
       await signOutFirebase()
     } catch {
       // Local session is already cleared.
     }
-  }, [clearCart])
+  }, [])
 
   useEffect(() => {
     const auth = getFirebaseAuth()

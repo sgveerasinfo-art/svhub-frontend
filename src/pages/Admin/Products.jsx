@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { useAdminStore } from '../../context/AdminStore.jsx'
+import { getAdminProducts, updateAdminProduct } from '../../api/adminProducts.js'
+import { getAdminCategories } from '../../api/adminCategories.js'
 import { useAdminUi, usePagedList } from '../../context/AdminUi.jsx'
 import { ADMIN_PAGE_SIZE, STOREFRONTS, categoryLabel, formatAdminDate, matchesQuery, storefrontLabel } from '../../data/admin.js'
 import { formatPrice } from '../../utils/money.js'
@@ -334,9 +335,12 @@ function useCompactCatalog() {
 
 function Products() {
   const navigate = useNavigate()
-  const { ready, products, categories, upsertProduct } = useAdminStore()
   const { toast, confirm } = useAdminUi()
   const [params, setParams] = useSearchParams()
+  const [products, setProducts] = useState([])
+  const [categories, setCategories] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [refreshIndex, setRefreshIndex] = useState(0)
   const [viewing, setViewing] = useState(null)
   const [selectedId, setSelectedId] = useState(null)
   const [menuId, setMenuId] = useState(null)
@@ -347,6 +351,28 @@ function Products() {
   const status = params.get('status') || 'all'
   const stock = params.get('stock') || 'all'
   const filtersOn = Boolean(query || house !== 'all' || category !== 'all' || status !== 'all' || stock !== 'all')
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+
+    Promise.all([
+      getAdminProducts({ limit: 100 }).catch(() => ({ data: [] })),
+      getAdminCategories().catch(() => ({ data: [] })),
+    ])
+      .then(([productsRes, categoriesRes]) => {
+        if (cancelled) return
+        setProducts(productsRes.data || [])
+        setCategories(categoriesRes.data || [])
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [refreshIndex])
 
   function set(key, value) {
     const next = new URLSearchParams(params)
@@ -364,7 +390,7 @@ function Products() {
     () =>
       categories
         .filter((item) => house === 'all' || item.storefront === house)
-        .map((item) => ({ value: item.id, label: item.name })),
+        .map((item) => ({ value: item.slug || item.id, label: item.name })),
     [categories, house],
   )
 
@@ -382,7 +408,7 @@ function Products() {
     return products
       .filter((product) => matchesQuery(query, product.name, product.sku, product.type))
       .filter((product) => (house === 'all' ? true : product.storefront === house))
-      .filter((product) => (category === 'all' ? true : product.category === category))
+      .filter((product) => (category === 'all' ? true : product.category === category || product.category?.slug === category))
       .filter((product) => {
         if (status === 'all') return true
         if (status === 'active') return product.active !== false
@@ -411,8 +437,15 @@ function Products() {
       confirmLabel: next ? 'Activate' : 'Deactivate',
     })
     if (!ok) return
-    upsertProduct({ ...product, active: next })
-    toast.success(next ? 'Product activated' : 'Product deactivated')
+    try {
+      await updateAdminProduct(product.id || product._id, { active: next, isActive: next })
+      setProducts((prev) =>
+        prev.map((p) => (p.id === product.id ? { ...p, active: next, isActive: next } : p))
+      )
+      toast.success(next ? 'Product activated' : 'Product deactivated')
+    } catch (err) {
+      toast.error(err.message || 'Could not update product status')
+    }
   }
 
   function openEdit(product) {
@@ -425,7 +458,7 @@ function Products() {
     setMenuId(null)
   }
 
-  if (!ready) return <LoadingState label="Loading products" />
+  if (loading) return <LoadingState label="Loading products" />
 
   const pages = pageList(paged.page, paged.pageCount)
 

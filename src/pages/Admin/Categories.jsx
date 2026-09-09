@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { useAdminStore } from '../../context/AdminStore.jsx'
+import {
+  getAdminCategories,
+  createAdminCategory,
+  updateAdminCategory,
+  deleteAdminCategory,
+} from '../../api/adminCategories.js'
+import { getAdminProducts } from '../../api/adminProducts.js'
 import { useAdminUi, usePagedList } from '../../context/AdminUi.jsx'
 import { ADMIN_PAGE_SIZE, STOREFRONTS, formatAdminDate, matchesQuery, slugify } from '../../data/admin.js'
 import { Icon } from '../../components/admin/icons.jsx'
@@ -359,8 +365,11 @@ function CategoryRow({ category, count, maxCount, compact, index, menuOpen, setM
 }
 
 function Categories() {
-  const { ready, categories, products, upsertCategory } = useAdminStore()
   const { toast, confirm } = useAdminUi()
+  const [categories, setCategories] = useState([])
+  const [products, setProducts] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [refreshIndex, setRefreshIndex] = useState(0)
   const [query, setQuery] = useState('')
   const [house, setHouse] = useState('all')
   const [status, setStatus] = useState('all')
@@ -368,6 +377,26 @@ function Categories() {
   const [menuId, setMenuId] = useState(null)
   const compact = useCompact()
   const filtersOn = Boolean(query || house !== 'all' || status !== 'all')
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    Promise.all([
+      getAdminCategories().catch(() => ({ data: [] })),
+      getAdminProducts({ limit: 100 }).catch(() => ({ data: [] })),
+    ])
+      .then(([catsRes, prodsRes]) => {
+        if (cancelled) return
+        setCategories(catsRes.data || [])
+        setProducts(prodsRes.data || [])
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [refreshIndex])
 
   const counts = useMemo(() => {
     const map = {}
@@ -422,17 +451,39 @@ function Categories() {
       danger: !next,
     })
     if (!ok) return
-    upsertCategory({ ...category, active: next })
-    toast.success(next ? 'Category activated' : 'Category deactivated')
+    try {
+      await updateAdminCategory(category.id || category._id, { active: next, isActive: next })
+      setCategories((prev) =>
+        prev.map((c) => (c.id === category.id ? { ...c, active: next, isActive: next } : c))
+      )
+      toast.success(next ? 'Category activated' : 'Category deactivated')
+    } catch (err) {
+      toast.error(err.message || 'Could not update category status')
+    }
   }
 
-  function handleSave(payload) {
-    upsertCategory(payload)
-    toast.success(payload.id ? 'Category saved' : 'Category added')
-    setEditing(null)
+  async function handleSave(payload) {
+    try {
+      if (payload.id) {
+        const res = await updateAdminCategory(payload.id, payload)
+        if (res?.data) {
+          setCategories((prev) => prev.map((c) => (c.id === payload.id ? res.data : c)))
+        }
+        toast.success('Category saved')
+      } else {
+        const res = await createAdminCategory(payload)
+        if (res?.data) {
+          setCategories((prev) => [...prev, res.data])
+        }
+        toast.success('Category added')
+      }
+      setEditing(null)
+    } catch (err) {
+      toast.error(err.message || 'Could not save category')
+    }
   }
 
-  if (!ready) return <LoadingState label="Loading categories" />
+  if (loading) return <LoadingState label="Loading categories" />
 
   return (
     <div className="admin-catalog admin-cats">

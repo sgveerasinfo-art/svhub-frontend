@@ -1,5 +1,6 @@
-import { categories as allCategories } from '../../data/categories.js'
-import { availabilityFilters, categoryCounts, priceFilters } from '../../data/shop.js'
+import { useEffect, useState } from 'react'
+import { getCategories } from '../../api/categories.js'
+import { availabilityFilters, priceFilters } from '../../data/shop.js'
 import { storefronts } from '../../data/storefronts.js'
 
 function ShopFilters({
@@ -13,9 +14,25 @@ function ShopFilters({
   lockedCategory = false,
   searchPlaceholder = 'Search rice, pickles, soaps…',
 }) {
-  const visibleCategories = categoryCounts(filters.storefront).filter(
-    (category) => category.count > 0 || filters.categoryIds.includes(category.slug),
-  )
+  const [categories, setCategories] = useState([])
+
+  useEffect(() => {
+    let cancelled = false
+    getCategories()
+      .then((res) => {
+        if (!cancelled && res?.data) {
+          setCategories(res.data)
+        }
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const visibleCategories = categories
+    .filter((category) => filters.storefront === 'all' || category.storefront === filters.storefront)
+    .filter((category) => (category.count || 0) > 0 || filters.categoryIds.includes(category.slug))
 
   function setField(partial) {
     onChange({ ...filters, ...partial })
@@ -73,7 +90,7 @@ function ShopFilters({
                     setField({
                       storefront: house.slug,
                       categoryIds: filters.categoryIds.filter((id) => {
-                        const match = allCategories.find((category) => category.slug === id)
+                        const match = categories.find((category) => category.slug === id)
                         return match?.storefront === house.slug
                       }),
                     })
@@ -92,7 +109,7 @@ function ShopFilters({
           <div className="shop-filters__choices">
             {visibleCategories.map((category) => (
               <label
-                key={category.id}
+                key={category.id || category.slug}
                 className={`shop-filters__choice${filters.categoryIds.includes(category.slug) ? ' is-selected' : ''}`}
               >
                 <input

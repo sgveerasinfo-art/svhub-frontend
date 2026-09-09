@@ -1,54 +1,99 @@
-import { useState } from 'react'
-import { useAdminStore } from '../../context/AdminStore.jsx'
+import { useEffect, useState } from 'react'
+import { getAdminSettings, updateAdminSettings } from '../../api/adminSettings.js'
 import { useAdminUi } from '../../context/AdminUi.jsx'
-import { AdminButton, FormField, LoadingState, PageHeader } from '../../components/admin/ui.jsx'
+import { AdminButton, ErrorState, FormField, LoadingState, PageHeader } from '../../components/admin/ui.jsx'
 
 function Settings() {
-  const { ready, settings, updateSettings, resetStore } = useAdminStore()
-  const { toast, confirm } = useAdminUi()
+  const [settings, setSettings] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const { toast } = useAdminUi()
   const [form, setForm] = useState(null)
   const [errors, setErrors] = useState({})
 
-  const value = form || settings
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    setError('')
+    getAdminSettings()
+      .then((res) => {
+        if (cancelled) return
+        setSettings(res.data)
+      })
+      .catch((err) => {
+        if (cancelled) return
+        setError(err.message || 'Could not load store settings.')
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const value = form || settings || {}
 
   function set(key, next) {
     setForm({ ...value, [key]: next })
   }
 
-  function save(event) {
+  async function save(event) {
     event.preventDefault()
     const nextErrors = {}
-    if (!value.supportEmail.includes('@')) nextErrors.supportEmail = 'Enter a valid email.'
+    if (!value.supportEmail || !value.supportEmail.includes('@')) nextErrors.supportEmail = 'Enter a valid email.'
     if (!(Number(value.standardShipping) >= 0)) nextErrors.standardShipping = 'Enter shipping in rupees.'
     setErrors(nextErrors)
     if (Object.keys(nextErrors).length) {
       toast.error('Check the highlighted fields.')
       return
     }
-    updateSettings({
-      ...value,
-      freeShippingFrom: Number(value.freeShippingFrom) || 0,
-      standardShipping: Number(value.standardShipping) || 0,
-      lowStockAlert: Number(value.lowStockAlert) || 10,
-    })
-    setForm(null)
-    toast.success('Settings saved')
+
+    setSaving(true)
+    try {
+      const payload = {
+        supportEmail: value.supportEmail,
+        supportPhone: value.supportPhone,
+        standardShippingFee: Number(value.standardShipping) || 0,
+        standardShipping: Number(value.standardShipping) || 0,
+        freeShippingThreshold: Number(value.freeShippingFrom) || 0,
+        freeShippingFrom: Number(value.freeShippingFrom) || 0,
+        lowStockThreshold: Number(value.lowStockAlert) || 10,
+        lowStockAlert: Number(value.lowStockAlert) || 10,
+      }
+      const res = await updateAdminSettings(payload)
+      setSettings(res.data)
+      setForm(null)
+      toast.success('Settings saved')
+    } catch (err) {
+      toast.error(err.message || 'Failed to save settings.')
+    } finally {
+      setSaving(false)
+    }
   }
 
-  async function reset() {
-    const ok = await confirm({
-      title: 'Reset demo data?',
-      message: 'Orders, products, inventory and settings will return to the seeded catalogue.',
-      confirmLabel: 'Reset',
-      danger: true,
-    })
-    if (!ok) return
-    resetStore()
-    setForm(null)
-    toast.info('Admin data reset')
+  function handleReload() {
+    setLoading(true)
+    setError('')
+    getAdminSettings()
+      .then((res) => {
+        setSettings(res.data)
+        setForm(null)
+        toast.info('Settings reloaded from database')
+      })
+      .catch((err) => {
+        setError(err.message || 'Failed to reload settings')
+      })
+      .finally(() => {
+        setLoading(false)
+      })
   }
 
-  if (!ready) return <LoadingState label="Loading settings" />
+  if (loading && !settings) return <LoadingState label="Loading settings" />
+  if (error && !settings) {
+    return <ErrorState title="Could not load settings" copy={error} onRetry={handleReload} />
+  }
 
   return (
     <div>
@@ -57,8 +102,8 @@ function Settings() {
         title="Settings"
         copy="Operational defaults for shipping, support and stock alerts. Brand colour stays in the chrome, not the forms."
         actions={
-          <AdminButton variant="ghost" onClick={reset}>
-            Reset demo data
+          <AdminButton variant="ghost" onClick={handleReload}>
+            Reload settings
           </AdminButton>
         }
       />
@@ -96,7 +141,9 @@ function Settings() {
           </FormField>
         </div>
         <div className="admin-modal__actions">
-          <AdminButton type="submit">Save settings</AdminButton>
+          <AdminButton type="submit" disabled={saving}>
+            {saving ? 'Saving...' : 'Save settings'}
+          </AdminButton>
         </div>
       </form>
     </div>

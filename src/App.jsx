@@ -48,10 +48,10 @@ import SystemStatesPage from './pages/SystemStates/SystemStatesPage.jsx'
 
 function App() {
   return (
-    <AuthProvider>
-      <CartProvider>
-        <SystemErrorBoundary>
-          <BrowserRouter>
+    <BrowserRouter>
+      <AuthProvider>
+        <CartProvider>
+          <SystemErrorBoundary>
             <Routes>
               <Route path="/admin/login" element={<AdminLogin />} />
               <Route element={<RequireAdmin />}>
@@ -109,10 +109,10 @@ function App() {
                 <Route path="*" element={<NotFoundPage />} />
               </Route>
             </Routes>
-          </BrowserRouter>
-        </SystemErrorBoundary>
-      </CartProvider>
-    </AuthProvider>
+          </SystemErrorBoundary>
+        </CartProvider>
+      </AuthProvider>
+    </BrowserRouter>
   )
 }
 

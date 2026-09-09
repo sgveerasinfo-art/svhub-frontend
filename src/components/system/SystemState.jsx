@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useInRouterContext } from 'react-router-dom'
 import {
   BasketIllustration,
   BatchIllustration,
@@ -14,6 +14,24 @@ import {
 } from './illustrations.jsx'
 import { Icon } from '../admin/icons.jsx'
 import './SystemState.css'
+
+function SafeLink({ to, children, className = '', ...props }) {
+  const inRouter = useInRouterContext()
+
+  if (!inRouter) {
+    return (
+      <a href={to} className={className} {...props}>
+        {children}
+      </a>
+    )
+  }
+
+  return (
+    <Link to={to} className={className} {...props}>
+      {children}
+    </Link>
+  )
+}
 
 /* ==========================================================================
    1. 404 Page Not Found
@@ -39,14 +57,14 @@ export function NotFoundState({
       <p className="sys-copy">{copy}</p>
       <div className="sys-actions">
         {primaryTo && (
-          <Link to={primaryTo} className="sys-btn sys-btn--primary">
+          <SafeLink to={primaryTo} className="sys-btn sys-btn--primary">
             {primaryLabel}
-          </Link>
+          </SafeLink>
         )}
         {secondaryTo && (
-          <Link to={secondaryTo} className="sys-btn sys-btn--ghost">
+          <SafeLink to={secondaryTo} className="sys-btn sys-btn--ghost">
             {secondaryLabel}
-          </Link>
+          </SafeLink>
         )}
       </div>
     </div>
@@ -78,9 +96,9 @@ export function ServerErrorState({
           Try Refreshing
         </button>
         {homeTo && (
-          <Link to={homeTo} className="sys-btn sys-btn--ghost">
+          <SafeLink to={homeTo} className="sys-btn sys-btn--ghost">
             Return Home
-          </Link>
+          </SafeLink>
         )}
       </div>
     </div>
@@ -208,9 +226,9 @@ export function EmptySearchState({
           <ul className="sys-chips-list">
             {suggestions.map((item) => (
               <li key={item}>
-                <Link to={`/search?q=${encodeURIComponent(item)}`} className="sys-chip">
+                <SafeLink to={`/search?q=${encodeURIComponent(item)}`} className="sys-chip">
                   {item}
-                </Link>
+                </SafeLink>
               </li>
             ))}
           </ul>
@@ -240,9 +258,9 @@ export function EmptyOrdersState({
       <h2 className="sys-title">{title}</h2>
       <p className="sys-copy">{copy}</p>
       <div className="sys-actions">
-        <Link to={shopTo} className="sys-btn sys-btn--primary">
+        <SafeLink to={shopTo} className="sys-btn sys-btn--primary">
           Start Your First Order
-        </Link>
+        </SafeLink>
       </div>
     </div>
   )
@@ -303,9 +321,9 @@ export function OutOfStockState({
 
       {similarTo && (
         <div className="sys-actions">
-          <Link to={similarTo} className="sys-btn sys-btn--ghost">
+          <SafeLink to={similarTo} className="sys-btn sys-btn--ghost">
             Explore Available Provisions
-          </Link>
+          </SafeLink>
         </div>
       )}
     </div>
@@ -463,9 +481,9 @@ export function PaymentErrorState({
           </button>
         )}
         {changeMethodTo && (
-          <Link to={changeMethodTo} className="sys-btn sys-btn--ghost">
+          <SafeLink to={changeMethodTo} className="sys-btn sys-btn--ghost">
             Choose Another Payment Method
-          </Link>
+          </SafeLink>
         )}
       </div>
     </div>
@@ -647,14 +665,14 @@ export function SessionExpiredState({
       <p className="sys-copy">{copy}</p>
       <div className="sys-actions">
         {loginTo && (
-          <Link to={loginTo} className="sys-btn sys-btn--primary">
+          <SafeLink to={loginTo} className="sys-btn sys-btn--primary">
             Sign In Again
-          </Link>
+          </SafeLink>
         )}
         {guestTo && (
-          <Link to={guestTo} className="sys-btn sys-btn--ghost">
+          <SafeLink to={guestTo} className="sys-btn sys-btn--ghost">
             Continue Browsing as Guest
-          </Link>
+          </SafeLink>
         )}
       </div>
     </div>

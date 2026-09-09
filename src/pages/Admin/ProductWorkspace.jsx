@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { useAdminStore } from '../../context/AdminStore.jsx'
+import {
+  getAdminProduct,
+  getAdminProducts,
+  createAdminProduct,
+  updateAdminProduct,
+} from '../../api/adminProducts.js'
+import { getAdminCategories } from '../../api/adminCategories.js'
 import { useAdminUi } from '../../context/AdminUi.jsx'
 import { STOREFRONTS, slugify, stockFromQty, storefrontLabel } from '../../data/admin.js'
 import { getProductDetail } from '../../data/productDetails.js'
@@ -193,7 +199,7 @@ function ImageSlot({ label, copy, value, status, error, onPick, onClear, compact
 function CategorySelect({ value, options, error, onChange }) {
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
-  const selected = options.find((item) => item.id === value)
+  const selected = options.find((item) => item.id === value || item.slug === value)
 
   useEffect(() => {
     if (!open) return undefined
@@ -216,12 +222,12 @@ function CategorySelect({ value, options, error, onChange }) {
         <div className="product-new__menu" role="listbox">
           {options.map((item) => (
             <button
-              key={item.id}
+              key={item.id || item.slug}
               type="button"
               role="option"
-              aria-selected={item.id === value}
+              aria-selected={item.id === value || item.slug === value}
               onClick={() => {
-                onChange(item.id)
+                onChange(item.slug || item.id)
                 setOpen(false)
               }}
             >
@@ -238,12 +244,11 @@ function CategorySelect({ value, options, error, onChange }) {
 export default function ProductWorkspace({ mode = 'create', productId }) {
   const editing = mode === 'edit'
   const navigate = useNavigate()
-  const { ready, products, categories, upsertProduct } = useAdminStore()
   const { toast, confirm } = useAdminUi()
-  const product = useMemo(
-    () => (editing ? products.find((item) => item.id === productId || item.slug === productId) : null),
-    [editing, products, productId],
-  )
+  const [loading, setLoading] = useState(true)
+  const [product, setProduct] = useState(null)
+  const [products, setProducts] = useState([])
+  const [categories, setCategories] = useState([])
   const [form, setForm] = useState(EMPTY)
   const [errors, setErrors] = useState({})
   const [slugTouched, setSlugTouched] = useState(editing)
@@ -257,19 +262,44 @@ export default function ProductWorkspace({ mode = 'create', productId }) {
   const [statusBusy, setStatusBusy] = useState(false)
 
   useEffect(() => {
-    if (!editing || !ready || !product) return
-    const next = formFromProduct(product)
-    setForm(next)
-    setSlugTouched(true)
-    setSkuTouched(true)
-    setDirty(false)
-    setErrors({})
-    setSaveState('idle')
-    setMainStatus(next.image ? 'ready' : 'idle')
-    setMainError('')
-    setGalleryStatus(next.gallery.length ? 'ready' : 'idle')
-    setGalleryError('')
-  }, [editing, ready, productId])
+    let cancelled = false
+    setLoading(true)
+
+    const promises = [
+      getAdminCategories().catch(() => ({ data: [] })),
+      getAdminProducts({ limit: 100 }).catch(() => ({ data: [] })),
+    ]
+    if (editing && productId) {
+      promises.push(getAdminProduct(productId).catch(() => ({ data: null })))
+    }
+
+    Promise.all(promises)
+      .then(([catsRes, prodsRes, prodRes]) => {
+        if (cancelled) return
+        setCategories(catsRes.data || [])
+        setProducts(prodsRes.data || [])
+        if (editing && prodRes?.data) {
+          const loadedProduct = prodRes.data
+          setProduct(loadedProduct)
+          const next = formFromProduct(loadedProduct)
+          setForm(next)
+          setSlugTouched(true)
+          setSkuTouched(true)
+          setDirty(false)
+          setErrors({})
+          setSaveState('idle')
+          setMainStatus(next.image ? 'ready' : 'idle')
+          setGalleryStatus(next.gallery.length ? 'ready' : 'idle')
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [editing, productId])
 
   const houseCategories = useMemo(
     () => categories.filter((item) => item.storefront === form.storefront),
@@ -278,7 +308,7 @@ export default function ProductWorkspace({ mode = 'create', productId }) {
 
   const stock = stockFromQty(form.qty)
   const discount = discountFrom(form.price, form.originalPrice)
-  const categoryName = houseCategories.find((item) => item.id === form.category)?.name || ''
+  const categoryName = houseCategories.find((item) => item.id === form.category || item.slug === form.category)?.name || ''
 
   function touch(next) {
     setDirty(true)
@@ -389,14 +419,14 @@ export default function ProductWorkspace({ mode = 'create', productId }) {
   }
 
   function payloadFromForm() {
-    const category = houseCategories.find((item) => item.id === form.category)
+    const category = houseCategories.find((item) => item.id === form.category || item.slug === form.category)
     return {
       ...(editing && product ? { id: product.id } : {}),
       name: form.name.trim(),
       slug: form.slug,
       description: form.description.trim(),
       storefront: form.storefront,
-      category: form.category,
+      category: category?.slug || form.category,
       type: category?.name || '',
       price: Number(form.price),
       originalPrice: form.originalPrice ? Number(form.originalPrice) : null,
@@ -418,16 +448,31 @@ export default function ProductWorkspace({ mode = 'create', productId }) {
     setErrors(nextErrors)
     if (Object.keys(nextErrors).length) return
     setSaveState('saving')
-    await new Promise((resolve) => window.setTimeout(resolve, 280))
-    upsertProduct(payloadFromForm())
-    setSaveState('saved')
-    setDirty(false)
-    toast.success(editing ? 'Changes saved' : 'Product added')
-    if (editing) {
-      window.setTimeout(() => setSaveState('idle'), 900)
-      return
+    try {
+      const payload = payloadFromForm()
+      let res
+      if (editing) {
+        res = await updateAdminProduct(product?.id || productId, payload)
+        if (res?.data) {
+          setProduct(res.data)
+          const next = formFromProduct(res.data)
+          setForm(next)
+        }
+      } else {
+        res = await createAdminProduct(payload)
+      }
+      setSaveState('saved')
+      setDirty(false)
+      toast.success(editing ? 'Changes saved' : 'Product added')
+      if (editing) {
+        window.setTimeout(() => setSaveState('idle'), 900)
+        return
+      }
+      window.setTimeout(() => navigate('/admin/products'), 700)
+    } catch (err) {
+      setSaveState('idle')
+      toast.error(err.message || 'Could not save product')
     }
-    window.setTimeout(() => navigate('/admin/products'), 700)
   }
 
   async function toggleStatus() {
@@ -443,13 +488,21 @@ export default function ProductWorkspace({ mode = 'create', productId }) {
     })
     if (!ok) return
     setStatusBusy(true)
-    upsertProduct({ ...product, active: next })
-    setForm((current) => ({ ...current, active: next }))
-    setStatusBusy(false)
-    toast.success(next ? 'Product activated' : 'Product deactivated')
+    try {
+      const res = await updateAdminProduct(product.id || productId, { active: next, isActive: next })
+      if (res?.data) {
+        setProduct(res.data)
+      }
+      setForm((current) => ({ ...current, active: next }))
+      toast.success(next ? 'Product activated' : 'Product deactivated')
+    } catch (err) {
+      toast.error(err.message || 'Could not update product status')
+    } finally {
+      setStatusBusy(false)
+    }
   }
 
-  if (!ready) return <LoadingState label={editing ? 'Loading product' : 'Loading catalogue'} />
+  if (loading) return <LoadingState label={editing ? 'Loading product' : 'Loading catalogue'} />
 
   if (editing && !product) {
     return (

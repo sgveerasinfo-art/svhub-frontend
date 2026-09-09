@@ -1,43 +1,16 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import {
-  ADMIN_STORAGE_KEY,
   LOW_STOCK_MAX,
   seedAdminStore,
   skuFor,
   slugify,
   stockFromQty,
 } from '../data/admin.js'
+import { getAdminProducts } from '../api/adminProducts.js'
+import { getAdminCategories } from '../api/adminCategories.js'
+import { getAdminOrders } from '../api/adminOrders.js'
 
 const AdminStoreContext = createContext(null)
-
-function readStore() {
-  try {
-    const raw = window.localStorage.getItem(ADMIN_STORAGE_KEY)
-    if (!raw) return { data: seedAdminStore(), error: null }
-    const parsed = JSON.parse(raw)
-    if (!parsed?.products || !parsed?.orders) {
-      return { data: seedAdminStore(), error: null }
-    }
-    return {
-      data: {
-        ...seedAdminStore(),
-        ...parsed,
-        settings: { ...seedAdminStore().settings, ...(parsed.settings || {}) },
-      },
-      error: null,
-    }
-  } catch {
-    return { data: seedAdminStore(), error: 'Could not load saved admin data. Demo catalogue was restored.' }
-  }
-}
-
-function writeStore(data) {
-  try {
-    window.localStorage.setItem(ADMIN_STORAGE_KEY, JSON.stringify(data))
-  } catch {
-    /* ignore quota / private mode */
-  }
-}
 
 export function AdminStoreProvider({ children }) {
   const [store, setStore] = useState(() => seedAdminStore())
@@ -45,19 +18,26 @@ export function AdminStoreProvider({ children }) {
   const [bootError, setBootError] = useState('')
 
   useEffect(() => {
-    const loaded = readStore()
-    const timer = window.setTimeout(() => {
-      setStore(loaded.data)
-      setBootError(loaded.error || '')
-      setReady(true)
-    }, 280)
-    return () => window.clearTimeout(timer)
+    Promise.all([
+      getAdminProducts({ limit: 100 }).catch(() => null),
+      getAdminCategories().catch(() => null),
+      getAdminOrders({ limit: 50 }).catch(() => null),
+    ])
+      .then(([prodRes, catRes, ordRes]) => {
+        setStore((current) => ({
+          ...current,
+          ...(prodRes?.data ? { products: prodRes.data } : {}),
+          ...(catRes?.data ? { categories: catRes.data } : {}),
+          ...(ordRes?.orders ? { orders: ordRes.orders } : {}),
+        }))
+      })
+      .catch((err) => {
+        setBootError(err.message || '')
+      })
+      .finally(() => {
+        setReady(true)
+      })
   }, [])
-
-  useEffect(() => {
-    if (!ready) return
-    writeStore(store)
-  }, [ready, store])
 
   const commit = useCallback((updater) => {
     setStore((current) => (typeof updater === 'function' ? updater(current) : updater))
@@ -192,9 +172,6 @@ export function AdminStoreProvider({ children }) {
   }, [commit])
 
   const resetStore = useCallback(() => {
-    const next = seedAdminStore()
-    writeStore(next)
-    setStore(next)
     setBootError('')
   }, [])
 

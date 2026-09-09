@@ -261,18 +261,25 @@ function AlertMenu() {
   )
 }
 
-function StaffMenu({ onLogout }) {
+function StaffMenu({ onLogout, user }) {
   const [open, setOpen] = useState(false)
   const ref = useDismiss(open, setOpen)
+  const displayName = user?.name || 'Operations Admin'
+  const initials = displayName
+    .split(' ')
+    .map((n) => n[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase()
 
   return (
     <div className="admin-pop admin-staff" ref={ref}>
       <button type="button" className="admin-staff__btn" aria-expanded={open} onClick={() => setOpen((value) => !value)}>
         <span className="admin-staff__avatar" aria-hidden="true">
-          AK
+          {initials}
         </span>
         <span className="admin-staff__meta">
-          <strong>Asha Kumar</strong>
+          <strong>{displayName}</strong>
           <em>Operations</em>
         </span>
         <Icon name="chevron" size={14} />
@@ -297,7 +304,7 @@ function StaffMenu({ onLogout }) {
 function AdminShell() {
   const { pathname } = useLocation()
   const navigate = useNavigate()
-  const { logout } = useAuth()
+  const { user, logout } = useAuth()
   const { confirm, confirmState, settleConfirm, toasts, dismissToast } = useAdminUi()
   const [menuOpen, setMenuOpen] = useState(false)
 
@@ -371,7 +378,7 @@ function AdminShell() {
           <GlobalSearch />
           <div className="admin-topbar__right">
             <AlertMenu />
-            <StaffMenu onLogout={handleLogout} />
+            <StaffMenu onLogout={handleLogout} user={user} />
           </div>
         </header>
 

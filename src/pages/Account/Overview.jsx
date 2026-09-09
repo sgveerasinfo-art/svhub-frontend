@@ -1,19 +1,84 @@
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { formatPrice } from '../../utils/money.js'
-import {
-  formatOrderDate,
-  getAccountAddresses,
-  getAccountOrders,
-  padCount,
-} from '../../data/account.js'
+import { formatOrderDate, padCount } from '../../data/account.js'
+import { getOrders } from '../../api/orders.js'
+import { getAddresses } from '../../api/addresses.js'
 import AccountLoginPrompt from './AccountLoginPrompt.jsx'
 import { EmptyState, OrderList, StatusMark } from './OrderList.jsx'
 
+function mapStatus(raw) {
+  const map = {
+    PENDING_PAYMENT: 'Pending',
+    CONFIRMED: 'Confirmed',
+    PROCESSING: 'Processing',
+    SHIPPED: 'Shipped',
+    DELIVERED: 'Delivered',
+    CANCELLED: 'Cancelled',
+  }
+  return map[String(raw || '').toUpperCase()] ?? String(raw ?? 'Pending')
+}
+
+function mapPaymentStatus(raw) {
+  const map = {
+    PENDING: 'Pending',
+    PAID: 'Paid',
+    FAILED: 'Failed',
+    REFUNDED: 'Refunded',
+  }
+  return map[String(raw || '').toUpperCase()] ?? String(raw ?? 'Pending')
+}
+
+function normaliseOrder(order) {
+  return {
+    id: order.id,
+    number: order.orderNumber,
+    date: order.createdAt,
+    status: mapStatus(order.status),
+    paymentStatus: mapPaymentStatus(order.paymentStatus),
+    amount: order.totalAmount,
+    items: (order.items || []).map((item) => ({
+      id: item.productId,
+      name: item.productName,
+      weight: item.variantLabel || item.weight || '',
+      quantity: item.quantity,
+      price: item.unitPrice,
+      image: item.image || '',
+      slug: item.slug || '',
+    })),
+  }
+}
+
 function Overview() {
   const { user } = useAuth()
-  const orders = user ? getAccountOrders(user) : []
-  const addresses = user ? getAccountAddresses(user) : []
+  const [orders, setOrders] = useState([])
+  const [addresses, setAddresses] = useState([])
+
+  useEffect(() => {
+    if (!user) {
+      setOrders([])
+      setAddresses([])
+      return
+    }
+
+    let cancelled = false
+
+    Promise.all([
+      getOrders().catch(() => ({ data: [] })),
+      getAddresses().catch(() => ({ data: [] })),
+    ]).then(([ordersRes, addressesRes]) => {
+      if (cancelled) return
+      const rawOrders = ordersRes?.data || []
+      setOrders(rawOrders.map(normaliseOrder))
+      setAddresses(addressesRes?.data || [])
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [user])
+
   const latest = orders[0] ?? null
   const recentOrders = orders.slice(0, 4)
   const firstItem = latest?.items?.[0]
