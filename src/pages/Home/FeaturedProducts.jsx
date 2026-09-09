@@ -1,8 +1,10 @@
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import Reveal from '../../components/ui/Reveal.jsx'
 import CartStepper from '../../components/ui/CartStepper.jsx'
 import { featuredIntro } from '../../data/home.js'
 import { featuredProducts, productHref } from '../../data/products.js'
+import { getFeaturedProducts } from '../../api/products.js'
 import { getStorefront } from '../../data/storefronts.js'
 import './FeaturedProducts.css'
 
@@ -121,6 +123,22 @@ function FeaturedItem({ product, layout }) {
 }
 
 function FeaturedProducts() {
+  const [items, setItems] = useState(featuredProducts)
+
+  useEffect(() => {
+    let cancelled = false
+    getFeaturedProducts(4)
+      .then((res) => {
+        if (!cancelled && res?.data?.length) {
+          setItems(res.data.slice(0, 4))
+        }
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   return (
     <section className="home-section home-section--white featured" aria-labelledby="featured-heading">
       <div className="home-container">
@@ -136,9 +154,9 @@ function FeaturedProducts() {
         </Reveal>
 
         <Reveal as="ul" className="home-stagger featured__showcase">
-          {featuredProducts.map((product, index) => (
+          {items.map((product, index) => (
             <FeaturedItem
-              key={product.id}
+              key={product.id || product.slug}
               product={product}
               layout={layouts[index] ?? 'set'}
             />

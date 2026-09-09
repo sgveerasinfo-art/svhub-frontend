@@ -8,10 +8,10 @@ import {
   countSearchFilters,
   parseSearchParams,
   priceFilters,
-  queryShop,
   searchParamsToSearch,
   searchSortOptions,
 } from '../../data/shop.js'
+import { getProducts } from '../../api/products.js'
 import { storefronts } from '../../data/storefronts.js'
 import ShopFilters from '../Shop/ShopFilters.jsx'
 import ShopProduct from '../Shop/ShopProduct.jsx'
@@ -103,7 +103,30 @@ function Search() {
   const [visible, setVisible] = useState(PAGE_SIZE)
   const inputRef = useRef(null)
 
-  const results = useMemo(() => queryShop(filters), [filters])
+  const [results, setResults] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [totalCount, setTotalCount] = useState(0)
+  const fetchRef = useRef(0)
+
+  useEffect(() => {
+    const id = ++fetchRef.current
+    setLoading(true)
+    getProducts({ ...filters, limit: 100 })
+      .then((res) => {
+        if (id !== fetchRef.current) return
+        setResults(res.data || [])
+        setTotalCount(res.pagination?.total ?? res.data?.length ?? 0)
+      })
+      .catch(() => {
+        if (id !== fetchRef.current) return
+        setResults([])
+        setTotalCount(0)
+      })
+      .finally(() => {
+        if (id === fetchRef.current) setLoading(false)
+      })
+  }, [filters])
+
   const shown = results.slice(0, visible)
   const chips = useMemo(() => activeChips(filters), [filters])
   const activeCount = countSearchFilters(filters)
@@ -184,9 +207,16 @@ function Search() {
     setVisible(PAGE_SIZE)
   }, [searchParams])
 
-  const countLabel =
-    results.length === 1 ? '1 matching product' : `${results.length} matching products`
-  const foundLabel = results.length === 1 ? '1 product found' : `${results.length} products found`
+  const countLabel = loading
+    ? 'Searching…'
+    : totalCount === 1
+      ? '1 matching product'
+      : `${totalCount} matching products`
+  const foundLabel = loading
+    ? 'Searching…'
+    : totalCount === 1
+      ? '1 product found'
+      : `${totalCount} products found`
   const houseLabel =
     filters.storefront === 'all'
       ? `Searching across ${storefronts.length} houses`
@@ -321,7 +351,11 @@ function Search() {
             </div>
           ) : null}
 
-          {results.length === 0 ? (
+          {loading ? (
+            <p className="search__loading" style={{ textAlign: 'center', padding: '3rem 0', color: 'var(--muted)' }} aria-busy="true">
+              Searching products…
+            </p>
+          ) : results.length === 0 ? (
             <div className="search__empty">
               <p className="search__empty-kicker">No matches</p>
               <h2>We couldn’t find what you’re looking for.</h2>

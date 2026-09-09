@@ -1,11 +1,35 @@
+import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { formatPrice } from '../../utils/money.js'
-import { formatOrderDate, getAccountOrder, orderTotals } from '../../data/account.js'
-import { productHref, products } from '../../data/products.js'
+import { getOrder } from '../../api/orders.js'
+import { formatOrderDate } from '../../data/account.js'
 import OrderTimeline from '../../components/order/OrderTimeline.jsx'
 import AccountLoginPrompt from './AccountLoginPrompt.jsx'
 import './OrderDetail.css'
+
+// ─── Status mapping ────────────────────────────────────────────────────────────
+function mapStatus(raw) {
+  const map = {
+    PENDING_PAYMENT: 'Pending',
+    CONFIRMED: 'Confirmed',
+    PROCESSING: 'Processing',
+    SHIPPED: 'Shipped',
+    DELIVERED: 'Delivered',
+    CANCELLED: 'Cancelled',
+  }
+  return map[String(raw || '').toUpperCase()] ?? String(raw ?? 'Pending')
+}
+
+function mapPaymentStatus(raw) {
+  const map = {
+    PENDING: 'Pending',
+    PAID: 'Paid',
+    FAILED: 'Failed',
+    REFUNDED: 'Refunded',
+  }
+  return map[String(raw || '').toUpperCase()] ?? String(raw ?? 'Pending')
+}
 
 function orderHeading(number) {
   const value = String(number || '').trim()
@@ -19,20 +43,6 @@ function crumbNumber(number) {
   return value.startsWith('#') ? value : `#${value}`
 }
 
-function itemTotal(item) {
-  return Number(item.price || 0) * (item.quantity || 1)
-}
-
-function itemHref(item) {
-  const match = products.find(
-    (product) =>
-      product.id === item.id ||
-      product.slug === item.slug ||
-      product.name === item.name,
-  )
-  return match ? productHref(match) : ''
-}
-
 function formatPhone(phone) {
   const raw = String(phone || '').trim()
   if (!raw) return ''
@@ -42,27 +52,6 @@ function formatPhone(phone) {
     return `+91 ${digits.slice(2, 7)} ${digits.slice(7)}`
   }
   return raw
-}
-
-function addressFromOrder(address) {
-  if (!address) return null
-  const lines = Array.isArray(address.lines) ? address.lines.filter(Boolean) : []
-  const street = String(address.street || lines[0] || '')
-    .replace(/,$/, '')
-    .trim()
-  const cityState = String(address.city && address.state ? `${address.city}, ${address.state}` : lines[1] || '')
-  const [city = '', state = ''] = address.city
-    ? [address.city, address.state || '']
-    : cityState.split(',').map((part) => part.trim())
-  const pin = String(address.pin || lines[2] || '')
-    .replace(/,$/, '')
-    .replace(/[^\d]/g, '')
-    .trim()
-  const name = address.name || ''
-  const phone = address.phone || ''
-  const label = address.label || ''
-  if (!name && !street && !phone && !lines.length) return null
-  return { label, name, street, city, state, pin, phone, lines }
 }
 
 function Arrow({ back = false }) {
@@ -105,6 +94,50 @@ function StatusLine({ label, value }) {
 function OrderDetail() {
   const { user } = useAuth()
   const { orderId } = useParams()
+  const [order, setOrder] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [notFound, setNotFound] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    if (!user || !orderId) return
+    setLoading(true)
+    setNotFound(false)
+    setError('')
+
+    getOrder(orderId)
+      .then((res) => {
+        const raw = res.data
+        setOrder({
+          id: raw.id,
+          number: raw.orderNumber,
+          date: raw.createdAt,
+          status: mapStatus(raw.status),
+          paymentStatus: mapPaymentStatus(raw.paymentStatus),
+          payment: raw.paymentMethod || null,
+          amount: raw.totalAmount,
+          subtotal: raw.subtotal,
+          shippingFee: raw.shippingFee,
+          discount: raw.discount,
+          address: raw.shippingAddress,
+          items: (raw.items || []).map((item) => ({
+            id: item.productId,
+            name: item.productName,
+            weight: item.variantLabel || item.weight || '',
+            quantity: item.quantity,
+            price: item.unitPrice,
+            lineTotal: item.lineTotal,
+            image: item.image || '',
+            slug: item.slug || '',
+          })),
+        })
+      })
+      .catch((err) => {
+        if (err.status === 404) setNotFound(true)
+        else setError(err.message || 'Could not load order.')
+      })
+      .finally(() => setLoading(false))
+  }, [user, orderId])
 
   if (!user) {
     return (
@@ -117,9 +150,15 @@ function OrderDetail() {
     )
   }
 
-  const order = getAccountOrder(orderId, user)
+  if (loading) {
+    return (
+      <div className="account-panel od">
+        <p className="od-note" aria-busy="true">Loading order details…</p>
+      </div>
+    )
+  }
 
-  if (!order) {
+  if (notFound || (!loading && !order && !error)) {
     return (
       <div className="account-panel od">
         <Link to="/account/orders" className="od-back">
@@ -128,7 +167,7 @@ function OrderDetail() {
         </Link>
         <div className="account-empty">
           <h2>Order not found</h2>
-          <p>We couldn’t find this order. It may have been moved, or the link is out of date.</p>
+          <p>We couldn&apos;t find this order. It may have been moved, or the link is out of date.</p>
           <Link to="/account/orders" className="od-action">
             Back to orders
             <Arrow />
@@ -138,12 +177,23 @@ function OrderDetail() {
     )
   }
 
-  const totals = orderTotals(order)
-  const address = addressFromOrder(order.address)
+  if (error) {
+    return (
+      <div className="account-panel od">
+        <Link to="/account/orders" className="od-back">
+          <Arrow back />
+          All orders
+        </Link>
+        <p className="orders__error" role="alert">{error}</p>
+      </div>
+    )
+  }
+
   const heading = orderHeading(order.number)
   const items = order.items || []
   const count = items.length
   const countLabel = count === 1 ? '1 item' : `${count} items`
+  const address = order.address
 
   return (
     <article className="od" aria-labelledby="od-heading">
@@ -182,7 +232,6 @@ function OrderDetail() {
         {items.length ? (
           <ul className="od-items">
             {items.map((item, index) => {
-              const href = itemHref(item)
               const image = item.image ? (
                 <img src={item.image} alt="" width="96" height="96" />
               ) : (
@@ -190,21 +239,9 @@ function OrderDetail() {
               )
               return (
                 <li key={`${item.name}-${item.weight}-${index}`}>
-                  {href ? (
-                    <Link to={href} className="od-items__media" aria-label={item.name}>
-                      {image}
-                    </Link>
-                  ) : (
-                    <span className="od-items__media">{image}</span>
-                  )}
+                  <span className="od-items__media">{image}</span>
                   <div className="od-items__info">
-                    {href ? (
-                      <Link to={href} className="od-items__name">
-                        {item.name}
-                      </Link>
-                    ) : (
-                      <p className="od-items__name">{item.name}</p>
-                    )}
+                    <p className="od-items__name">{item.name}</p>
                     {item.weight ? <p className="od-items__weight">{item.weight}</p> : null}
                   </div>
                   <p className="od-items__qty">
@@ -216,7 +253,7 @@ function OrderDetail() {
                   </p>
                   <p className="od-items__total">
                     <span>Total</span>
-                    {formatPrice(itemTotal(item))}
+                    {formatPrice(item.lineTotal ?? item.price * item.quantity)}
                   </p>
                 </li>
               )
@@ -234,16 +271,12 @@ function OrderDetail() {
           </h2>
           {address ? (
             <div className="od-address">
-              {address.label ? <p className="od-address__label">{address.label}</p> : null}
               {address.name ? <p className="od-address__name">{address.name}</p> : null}
               {address.street ? <p>{address.street}</p> : null}
               {address.city || address.state ? (
                 <p>{[address.city, address.state].filter(Boolean).join(', ')}</p>
               ) : null}
               {address.pin ? <p>{address.pin}</p> : null}
-              {!address.street && address.lines.length
-                ? address.lines.map((line) => <p key={line}>{line}</p>)
-                : null}
               {address.phone ? <p className="od-address__phone">{formatPhone(address.phone)}</p> : null}
             </div>
           ) : (
@@ -259,24 +292,24 @@ function OrderDetail() {
             <dl className="od-summary">
               <div>
                 <dt>Subtotal</dt>
-                <dd>{formatPrice(totals.subtotal)}</dd>
+                <dd>{formatPrice(order.subtotal ?? 0)}</dd>
               </div>
               <div>
                 <dt>Shipping</dt>
-                <dd>{totals.shipping ? formatPrice(totals.shipping) : 'Free'}</dd>
+                <dd>{order.shippingFee ? formatPrice(order.shippingFee) : 'Free'}</dd>
               </div>
               <div>
                 <dt>Discount</dt>
-                <dd>{totals.discount ? `− ${formatPrice(totals.discount)}` : formatPrice(0)}</dd>
+                <dd>{order.discount ? `− ${formatPrice(order.discount)}` : formatPrice(0)}</dd>
               </div>
               <div className="od-summary__total">
                 <dt>Total</dt>
-                <dd>{formatPrice(totals.total)}</dd>
+                <dd>{formatPrice(order.amount ?? 0)}</dd>
               </div>
             </dl>
           </section>
 
-          {order.payment || order.paymentStatus ? (
+          {order.paymentStatus ? (
             <section className="od-block" aria-labelledby="od-pay-heading">
               <h2 id="od-pay-heading" className="od-kicker">
                 Payment

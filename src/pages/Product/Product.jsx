@@ -4,7 +4,10 @@ import ProductGallery from '../../components/product/ProductGallery.jsx'
 import Button from '../../components/ui/Button.jsx'
 import QuantitySelector from '../../components/ui/QuantitySelector.jsx'
 import { useCart } from '../../context/CartContext.jsx'
-import { getProductDetail, readViewed, rememberViewed, relatedFor } from '../../data/productDetails.js'
+import { getProduct, getRelatedProducts } from '../../api/products.js'
+import { getCategoryBySlug } from '../../data/categories.js'
+import { getStorefront } from '../../data/storefronts.js'
+import { defaultShipping } from '../../data/productDetails.js'
 import ShopProduct from '../Shop/ShopProduct.jsx'
 import { formatPrice } from '../../utils/money.js'
 import './Product.css'
@@ -97,6 +100,25 @@ function ProductNotFound() {
   )
 }
 
+function ProductLoading() {
+  return (
+    <section className="pdp" aria-label="Loading product">
+      <div className="pdp__container">
+        <div className="pdp__layout" style={{ opacity: 0.5 }}>
+          <div className="shop-skel" style={{ height: 480 }} aria-hidden="true">
+            <span className="shop-skel__media" style={{ height: '100%' }} />
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <span className="shop-skel__line shop-skel__line--type" />
+            <span className="shop-skel__line shop-skel__line--name" style={{ height: '2rem' }} />
+            <span className="shop-skel__line shop-skel__line--price" />
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+}
+
 function DetailBlock({ title, open = false, children }) {
   return (
     <details className="pdp-detail" open={open}>
@@ -130,36 +152,112 @@ function ProductRail({ id, eyebrow, title, products }) {
   )
 }
 
+// Enrich a backend product with UI metadata from static lookups
+function enrichProduct(apiProduct) {
+  const storefrontData = getStorefront(apiProduct.storefront)
+  const categoryData = getCategoryBySlug(apiProduct.category)
+
+  // Normalize variants: backend uses variantId, UI uses id
+  const variants = (apiProduct.variants || []).map((v) => ({
+    ...v,
+    id: v.variantId, // UI compatibility
+    stock: v.stock || (v.qty > 0 ? (v.qty <= 10 ? 'low-stock' : 'in-stock') : 'out-of-stock'),
+  }))
+
+  // Derive gallery: backend returns array of strings, UI expects { src, alt }[]
+  const gallery = (apiProduct.gallery || [apiProduct.image]).filter(Boolean).map((src, i) => ({
+    src,
+    alt: i === 0 ? apiProduct.name : `${apiProduct.name} — view ${i + 1}`,
+  }))
+
+  return {
+    ...apiProduct,
+    variants,
+    gallery,
+    // Reconstruct static metadata the UI expects
+    storefrontMeta: storefrontData
+      ? {
+          name: storefrontData.name,
+          accent: storefrontData.accent,
+          accentToken: storefrontData.accentToken,
+          to: storefrontData.to,
+        }
+      : { name: apiProduct.storefront, accent: 'var(--espresso-brown)', accentToken: 'espresso', to: '/shop' },
+    categoryMeta: categoryData
+      ? { name: categoryData.name, to: categoryData.to }
+      : { name: apiProduct.category, to: '/shop' },
+    // information = specifications (same field, different name in old static data)
+    information: apiProduct.specifications || [],
+    shipping: defaultShipping,
+    // stock from base product
+    stock: apiProduct.stock || (apiProduct.qty > 0 ? (apiProduct.qty <= 10 ? 'low-stock' : 'in-stock') : 'out-of-stock'),
+  }
+}
+
 function Product() {
   const { slug } = useParams()
-  const product = useMemo(() => getProductDetail(slug), [slug])
-  const related = useMemo(() => (product ? relatedFor(product, 4) : []), [product])
+  const [product, setProduct] = useState(null)
+  const [related, setRelated] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [notFound, setNotFound] = useState(false)
 
   useEffect(() => {
-    window.scrollTo(0, 0)
-    if (!product) {
-      document.title = PAGE_TITLE
-      return undefined
-    }
-    document.title = `${product.name} · SV Hub`
-    rememberViewed(product.id)
+    if (!slug) return
+    setLoading(true)
+    setNotFound(false)
+    setProduct(null)
+    setRelated([])
+
+    getProduct(slug)
+      .then((res) => {
+        const enriched = enrichProduct(res.data)
+        setProduct(enriched)
+        document.title = `${enriched.name} · SV Hub`
+        // Store recently viewed by slug in localStorage
+        try {
+          const RECENT_KEY = 'svhub.recentlyViewed'
+          const current = JSON.parse(window.localStorage.getItem(RECENT_KEY) ?? '[]')
+          const list = Array.isArray(current) ? current.filter((s) => s !== enriched.slug) : []
+          window.localStorage.setItem(RECENT_KEY, JSON.stringify([enriched.slug, ...list].slice(0, 8)))
+        } catch { /* ignore */ }
+
+        // Fetch related in background
+        return getRelatedProducts(slug, 4)
+      })
+      .then((res) => {
+        setRelated((res?.data || []).map(enrichProduct))
+      })
+      .catch((err) => {
+        if (err.status === 404) {
+          setNotFound(true)
+        } else {
+          setNotFound(true) // treat errors as not found for simplicity
+        }
+        document.title = PAGE_TITLE
+      })
+      .finally(() => setLoading(false))
+
     return () => {
       document.title = PAGE_TITLE
     }
-  }, [product])
+  }, [slug])
 
-  if (!product) {
-    return <ProductNotFound />
-  }
+  useEffect(() => {
+    window.scrollTo(0, 0)
+  }, [slug])
 
-  return <ProductView key={product.id} product={product} related={related} />
+  if (loading) return <ProductLoading />
+  if (notFound || !product) return <ProductNotFound />
+
+  const [recent] = useState(() => readViewed(product.id, 4))
+
+  return <ProductView key={product.id} product={product} related={related} recent={recent} />
 }
 
-function ProductView({ product, related }) {
+function ProductView({ product, related, recent }) {
   const navigate = useNavigate()
-  const { setItemQuantity, quantityOf } = useCart()
+  const { addItem, setItemQuantity, quantityOf, items } = useCart()
   const [variantId, setVariantId] = useState(product.variants[0]?.id ?? '')
-  const [recent] = useState(() => readViewed(product.id, 4))
   const actionsRef = useRef(null)
   const [showSticky, setShowSticky] = useState(false)
   const [narrow, setNarrow] = useState(false)
@@ -208,21 +306,51 @@ function ProductView({ product, related }) {
     return () => observer.disconnect()
   }, [])
 
+  // For backend cart: we need productId (MongoDB ObjectId) + variantId
   const cartProduct = {
-    ...product,
+    // Backend cart item shape
+    productId: product.id,          // MongoDB ObjectId
+    variantId: variant?.variantId ?? variant?.id ?? variantId,
+    // UI display shape (for guest cart + display)
+    id: product.id,
+    slug: product.slug,
+    name: product.name,
+    type: product.type,
+    category: product.category,
+    storefront: product.storefront,
+    image: product.image,
     price,
     originalPrice,
     discount,
     sku,
-    weight: variant?.label ?? product.weight,
+    weight: variant?.label ?? variant?.weight ?? product.weight,
     stock,
   }
-  const quantity = quantityOf(cartProduct)
+
+  // Look up quantity: check items by itemId (logged in) or by product+variant (guest)
+  const cartItemKey = `${product.id}::${cartProduct.variantId}`
+  const quantity = useMemo(() => {
+    // Try to find in backend cart items first (itemId-keyed)
+    const backendItem = items.find(
+      (item) => item.productId === product.id && item.variantId === cartProduct.variantId,
+    )
+    if (backendItem) return backendItem.quantity
+    // Fallback for guest cart (id+weight keyed)
+    return quantityOf(cartProduct)
+  }, [items, product.id, cartProduct.variantId, cartProduct, quantityOf])
+
   const inCart = quantity > 0
 
   function handleQuantity(next) {
     if (outOfStock) return
-    setItemQuantity(cartProduct, next)
+    const backendItem = items.find(
+      (item) => item.productId === product.id && item.variantId === cartProduct.variantId,
+    )
+    if (backendItem) {
+      setItemQuantity(backendItem, next)
+    } else {
+      setItemQuantity(cartProduct, next)
+    }
   }
 
   function handleAdd() {
@@ -231,12 +359,12 @@ function ProductView({ product, related }) {
       navigate('/cart')
       return
     }
-    setItemQuantity(cartProduct, 1)
+    addItem(cartProduct, 1)
   }
 
   function handleBuy() {
     if (outOfStock) return
-    if (!inCart) setItemQuantity(cartProduct, 1)
+    if (!inCart) addItem(cartProduct, 1)
     navigate('/cart')
   }
 
@@ -452,7 +580,7 @@ function ProductView({ product, related }) {
         id="pdp-recent-heading"
         eyebrow="Recently viewed"
         title="Back to the pantry."
-        products={recent}
+        products={recent || []}
       />
 
       <div className={`pdp-sticky${showSticky ? ' is-visible' : ''}`} aria-hidden={!showSticky}>

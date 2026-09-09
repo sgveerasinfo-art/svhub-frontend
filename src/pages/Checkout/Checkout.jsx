@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { useCart } from '../../context/CartContext.jsx'
 import { useAuth } from '../../context/AuthContext.jsx'
-import { recordAccountOrder } from '../../data/account.js'
+import { createOrder } from '../../api/orders.js'
 import { formatPrice } from '../../utils/money.js'
 import './Checkout.css'
 
@@ -158,6 +158,8 @@ function Checkout() {
   const [errors, setErrors] = useState({})
   const [pinTouched, setPinTouched] = useState(false)
   const [placed, setPlaced] = useState(null)
+  const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState('')
 
   useEffect(() => {
     window.scrollTo(0, 0)
@@ -195,7 +197,7 @@ function Checkout() {
     return Object.keys(next).length === 0
   }
 
-  function handlePay(event) {
+  async function handlePay(event) {
     event.preventDefault()
     if (!validate()) {
       const first = document.querySelector('.co-field.is-invalid')
@@ -205,45 +207,66 @@ function Checkout() {
 
     const street = [form.street.trim(), form.apt.trim()].filter(Boolean).join(', ')
     const city = form.city.trim()
-    const order = {
-      orderNumber: `#SVH-${String(Math.floor(10000 + Math.random() * 90000))}`,
-      total,
-      date: new Date().toISOString(),
-      city: `${city}, ${STATE_SHORT[form.state] || form.state}`,
-      email: form.email.trim(),
-      addressLines: [`${street},`, `${city}, ${form.state},`, form.pin.trim()],
-      address: {
-        label: 'Home',
-        name: fullName(),
-        phone: form.phone.trim(),
-        lines: [`${street},`, `${city}, ${form.state},`, form.pin.trim()],
-      },
-      payment: 'Paid via Razorpay',
-      paymentStatus: 'Paid',
-      status: 'Confirmed',
-      subtotal,
-      shipping,
-      discount: 0,
-      amount: total,
-      items: items.map((item) => ({
-        name: item.name,
-        weight: item.weight,
-        quantity: item.quantity,
-        price: item.price,
-        image: item.image,
-      })),
+    const shippingAddress = {
+      name: fullName(),
+      phone: form.phone.trim(),
+      street,
+      city,
+      state: form.state,
+      pin: form.pin.trim(),
+      country: 'India',
     }
 
+    setSubmitting(true)
+    setSubmitError('')
     try {
-      sessionStorage.setItem('svhub.lastOrder', JSON.stringify(order))
-    } catch {
-      /* ignore quota / private mode */
-    }
-    recordAccountOrder(order, user)
+      const res = await createOrder({
+        shippingAddress,
+        shippingMethod: form.delivery === 'express' ? 'express' : 'standard',
+      })
+      const orderData = res.data
+      const successState = {
+        orderNumber: orderData.orderNumber,
+        total: orderData.totalAmount,
+        date: orderData.createdAt,
+        city: `${city}, ${STATE_SHORT[form.state] || form.state}`,
+        email: user?.email || form.email.trim(),
+        subtotal: orderData.subtotal,
+        shipping: orderData.shippingFee,
+        discount: orderData.discount || 0,
+        amount: orderData.totalAmount,
+        status: 'Pending',
+        paymentStatus: 'Pending',
+        addressLines: [street, `${city}, ${form.state}`, form.pin.trim()],
+        address: {
+          name: fullName(),
+          phone: form.phone.trim(),
+          lines: [street, `${city}, ${form.state}`, form.pin.trim()],
+        },
+        items: (orderData.items || []).map((item) => ({
+          name: item.productName,
+          weight: item.variantLabel || item.weight || '',
+          quantity: item.quantity,
+          price: item.unitPrice,
+          image: item.image || '',
+        })),
+      }
 
-    setPlaced(order)
-    clearCart()
-    navigate('/order-success', { state: order, replace: true })
+      try {
+        sessionStorage.setItem('svhub.lastOrder', JSON.stringify(successState))
+      } catch {
+        /* ignore quota / private mode */
+      }
+
+      setPlaced(successState)
+      await clearCart()
+      navigate('/order-success', { state: successState, replace: true })
+    } catch (err) {
+      setSubmitError(err.message || 'Could not place order. Please try again.')
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   const pinError = pinTouched && form.pin !== '' && !pinOk(form.pin) ? 'Please enter a valid 6-digit numeric PIN code.' : errors.pin
@@ -613,9 +636,14 @@ function Checkout() {
       </main>
 
       <div className="co-dock">
-        <button type="submit" form="checkout-form" className="co-pay">
+        {submitError ? (
+          <p className="co-error" role="alert" style={{ color: 'var(--state-error)', marginBottom: '0.5rem', fontSize: '0.875rem' }}>
+            {submitError}
+          </p>
+        ) : null}
+        <button type="submit" form="checkout-form" className="co-pay" disabled={submitting} aria-busy={submitting}>
           <IconLock />
-          Pay Securely — {formatPrice(total)}
+          {submitting ? 'Placing order…' : `Pay Securely — ${formatPrice(total)}`}
         </button>
       </div>
     </div>

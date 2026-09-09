@@ -6,9 +6,9 @@ import {
   countListingFilters,
   listingParamsToSearch,
   parseListingParams,
-  queryShop,
   sortOptions,
 } from '../../data/shop.js'
+import { getProducts } from '../../api/products.js'
 import { getStorefront } from '../../data/storefronts.js'
 import ShopFilters from '../Shop/ShopFilters.jsx'
 import ShopProduct from '../Shop/ShopProduct.jsx'
@@ -106,22 +106,55 @@ function Category() {
     [filters, category],
   )
 
-  const results = useMemo(() => (category ? queryShop(queryFilters) : []), [category, queryFilters])
-  const totalPages = Math.max(1, Math.ceil(results.length / PAGE_SIZE))
-  const page = Math.min(filters.page || 1, totalPages)
-  const start = results.length === 0 ? 0 : (page - 1) * PAGE_SIZE
-  const shown = results.slice(start, start + PAGE_SIZE)
-  const rangeStart = results.length === 0 ? 0 : start + 1
-  const rangeEnd = start + shown.length
+  const [loading, setLoading] = useState(true)
+  const [products, setProducts] = useState([])
+  const [pagination, setPagination] = useState({ total: 0, totalPages: 1, page: 1 })
+  const fetchRef = useRef(0)
+
+  useEffect(() => {
+    if (!category) {
+      setProducts([])
+      setPagination({ total: 0, totalPages: 1, page: 1 })
+      setLoading(false)
+      return
+    }
+
+    const id = ++fetchRef.current
+    setLoading(true)
+
+    getProducts({
+      ...queryFilters,
+      page: filters.page || 1,
+      limit: PAGE_SIZE,
+    })
+      .then((res) => {
+        if (id !== fetchRef.current) return
+        setProducts(res.data || [])
+        setPagination(res.pagination || { total: 0, totalPages: 1, page: filters.page || 1 })
+      })
+      .catch(() => {
+        if (id !== fetchRef.current) return
+        setProducts([])
+      })
+      .finally(() => {
+        if (id === fetchRef.current) setLoading(false)
+      })
+  }, [category, queryFilters, filters.page])
+
+  const totalPages = pagination.totalPages
+  const page = pagination.page
+  const shown = products
+  const rangeStart = pagination.total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1
+  const rangeEnd = Math.min(pagination.total, (page - 1) * PAGE_SIZE + products.length)
   const activeCount = countListingFilters(filters)
   const sortLabel = sortOptions.find((option) => option.id === filters.sort)?.label ?? 'Featured'
-  const countLabel = `${results.length} ${results.length === 1 ? 'product' : 'products'}`
+  const countLabel = `${pagination.total} ${pagination.total === 1 ? 'product' : 'products'}`
   const catalogMeta = house ? `${countLabel} · ${house.kicker}` : countLabel
   const pages = pagerPages(page, totalPages)
   const searchPlaceholder = category
     ? `Search ${category.name.toLowerCase()}…`
     : 'Search rice, pickles, soaps…'
-  const allUnavailable = results.length > 0 && results.every((product) => product.stock === 'out-of-stock')
+  const allUnavailable = products.length > 0 && products.every((product) => product.stock === 'out-of-stock')
   const showingUnavailable = filters.availability === 'out-of-stock'
 
   const applyFilters = useCallback(
@@ -142,7 +175,6 @@ function Category() {
   useEffect(() => {
     window.scrollTo(0, 0)
     setSheet(null)
-    setBooting(true)
 
     if (prevSlug.current !== slug) {
       setQueryDraft('')
@@ -164,11 +196,6 @@ function Category() {
 
     return () => window.clearTimeout(timer)
   }, [queryDraft, filters, applyFilters])
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => setBooting(false), 160)
-    return () => window.clearTimeout(timer)
-  }, [slug])
 
   useEffect(() => {
     if (!pageReady.current) {
@@ -314,7 +341,7 @@ function Category() {
           Sort
         </button>
         <p className="shop__dock-count" aria-live="polite">
-          {results.length ? `${rangeStart}–${rangeEnd} of ${results.length}` : countLabel}
+          {pagination.total ? `${rangeStart}–${rangeEnd} of ${pagination.total}` : countLabel}
         </p>
       </div>
 
@@ -343,8 +370,8 @@ function Category() {
         <div className="shop__main" ref={mainRef}>
           <div className="shop__toolbar">
             <p className="shop__count" aria-live="polite">
-              {results.length
-                ? `Showing ${rangeStart}–${rangeEnd} of ${results.length}`
+              {pagination.total
+                ? `Showing ${rangeStart}–${rangeEnd} of ${pagination.total}`
                 : countLabel}
             </p>
 
@@ -364,7 +391,7 @@ function Category() {
             </label>
           </div>
 
-          {booting ? (
+          {loading ? (
             <ul className="shop__grid" aria-busy="true" aria-label="Loading products">
               {Array.from({ length: 9 }, (_, index) => (
                 <li key={index}>
@@ -372,7 +399,7 @@ function Category() {
                 </li>
               ))}
             </ul>
-          ) : results.length === 0 ? (
+          ) : products.length === 0 ? (
             <div className="shop__empty">
               <p className="shop__empty-eyebrow">
                 {showingUnavailable ? 'Out of stock' : 'No matches'}
@@ -412,7 +439,7 @@ function Category() {
 
               <div className="shop__footer">
                 <p className="shop__shown">
-                  Showing {rangeStart}–{rangeEnd} of {results.length}
+                  Showing {rangeStart}–{rangeEnd} of {pagination.total}
                 </p>
                 {totalPages > 1 ? (
                   <nav className="shop__pager" aria-label="Product pages">

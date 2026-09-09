@@ -1,9 +1,55 @@
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { formatPrice } from '../../utils/money.js'
-import { formatOrderDate, getAccountOrders, padCount } from '../../data/account.js'
+import { getOrders } from '../../api/orders.js'
+import { formatOrderDate, padCount } from '../../data/account.js'
 import { EmptyState, OrderPreview, StatusBadge } from './OrderList.jsx'
 import './Orders.css'
+
+// ─── Status mapping ────────────────────────────────────────────────────────────
+function mapStatus(raw) {
+  const map = {
+    PENDING_PAYMENT: 'Pending',
+    CONFIRMED: 'Confirmed',
+    PROCESSING: 'Processing',
+    SHIPPED: 'Shipped',
+    DELIVERED: 'Delivered',
+    CANCELLED: 'Cancelled',
+  }
+  return map[String(raw || '').toUpperCase()] ?? String(raw ?? 'Pending')
+}
+
+function mapPaymentStatus(raw) {
+  const map = {
+    PENDING: 'Pending',
+    PAID: 'Paid',
+    FAILED: 'Failed',
+    REFUNDED: 'Refunded',
+  }
+  return map[String(raw || '').toUpperCase()] ?? String(raw ?? 'Pending')
+}
+
+// Normalise backend order to the shape the existing UI components expect
+function normaliseOrder(order) {
+  return {
+    id: order.id,
+    number: order.orderNumber,
+    date: order.createdAt,
+    status: mapStatus(order.status),
+    paymentStatus: mapPaymentStatus(order.paymentStatus),
+    amount: order.totalAmount,
+    items: (order.items || []).map((item) => ({
+      id: item.productId,
+      name: item.productName,
+      weight: item.variantLabel || item.weight || '',
+      quantity: item.quantity,
+      price: item.unitPrice,
+      image: item.image || '',
+      slug: item.slug || '',
+    })),
+  }
+}
 
 function Arrow() {
   return (
@@ -21,8 +67,25 @@ function Arrow() {
 
 function Orders() {
   const { user } = useAuth()
-  const orders = user ? getAccountOrders(user) : []
+  const [orders, setOrders] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
   const countLabel = orders.length === 1 ? '1 order' : `${padCount(orders.length)} orders`
+
+  useEffect(() => {
+    if (!user) return
+    setLoading(true)
+    setError('')
+
+    getOrders(50)
+      .then((res) => {
+        setOrders((res.data || []).map(normaliseOrder))
+      })
+      .catch((err) => {
+        setError(err.message || 'Could not load orders.')
+      })
+      .finally(() => setLoading(false))
+  }, [user])
 
   return (
     <div className="account-panel orders">
@@ -35,11 +98,15 @@ function Orders() {
           Track every pot of rice, jar of thokku and bar of soap on its way from our kitchen to yours.
         </p>
         <p className="orders__count" aria-live="polite">
-          {countLabel}
+          {loading ? 'Loading orders…' : error ? '' : countLabel}
         </p>
       </header>
 
-      {orders.length === 0 ? (
+      {error ? (
+        <p className="orders__error" role="alert">{error}</p>
+      ) : loading ? (
+        <p className="orders__loading" aria-busy="true">Loading your orders…</p>
+      ) : orders.length === 0 ? (
         <EmptyState
           title="No orders yet"
           copy="Your first SV Hub order is waiting to find its way home."

@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   nutriHubCategories,
@@ -9,6 +9,7 @@ import {
   nutriHubPantry,
   nutriHubStory,
 } from '../../data/nutriHub.js'
+import { getProducts } from '../../api/products.js'
 import ShopProduct from '../Shop/ShopProduct.jsx'
 import './NutriHub.css'
 
@@ -83,6 +84,22 @@ function NutriPantry() {
 }
 
 function NutriFeatured() {
+  const [items, setItems] = useState(nutriHubFeatured)
+
+  useEffect(() => {
+    let cancelled = false
+    getProducts({ storefront: 'nutri-hub', limit: 4 })
+      .then((res) => {
+        if (!cancelled && res?.data?.length) {
+          setItems(res.data.slice(0, 4))
+        }
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   return (
     <section className="nh-featured" aria-labelledby="nutri-featured-heading">
       <div className="nh-wrap">
@@ -96,8 +113,8 @@ function NutriFeatured() {
         </div>
 
         <ul className="nh-product-grid">
-          {nutriHubFeatured.map((product, index) => (
-            <li key={product.id}>
+          {items.map((product, index) => (
+            <li key={product.id || product.slug}>
               <ShopProduct product={product} index={index} />
             </li>
           ))}

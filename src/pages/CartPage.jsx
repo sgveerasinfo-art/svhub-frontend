@@ -1,8 +1,9 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useCart } from '../context/CartContext.jsx'
 import { getCategoryBySlug } from '../data/categories.js'
-import { featuredProducts, productHref, products } from '../data/products.js'
+import { productHref } from '../data/products.js'
+import { getFeaturedProducts } from '../api/products.js'
 import { getStorefront } from '../data/storefronts.js'
 import { formatPrice } from '../utils/money.js'
 import './CartPage.css'
@@ -10,7 +11,7 @@ import './CartPage.css'
 const MAX_QTY = 12
 
 function lineKey(item) {
-  return `${item.id}::${item.weight ?? ''}`
+  return item.itemId || `${item.id || item.productId}::${item.weight ?? ''}`
 }
 
 function houseClass(storefront) {
@@ -247,13 +248,30 @@ function CartPage() {
     () => items.reduce((sum, item) => sum + item.price * item.quantity, 0),
     [items],
   )
+  const [featuredList, setFeaturedList] = useState([])
+
+  useEffect(() => {
+    let cancelled = false
+    getFeaturedProducts(6)
+      .then((res) => {
+        if (!cancelled && res?.data) {
+          setFeaturedList(res.data)
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to load featured products:', err)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   const suggested = useMemo(() => {
-    const inCart = new Set(items.map((item) => item.id))
-    const rest = products.filter((product) => !inCart.has(product.id))
-    const featured = featuredProducts.filter((product) => !inCart.has(product.id))
-    const featuredIds = new Set(featured.map((product) => product.id))
-    return [...featured, ...rest.filter((product) => !featuredIds.has(product.id))].slice(0, 3)
-  }, [items])
+    const inCartIds = new Set(items.map((item) => item.productId || item.id || item.slug))
+    return featuredList
+      .filter((product) => !inCartIds.has(product.id) && !inCartIds.has(product.slug))
+      .slice(0, 3)
+  }, [items, featuredList])
 
   return (
     <section className="cart-page">

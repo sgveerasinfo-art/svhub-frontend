@@ -5,11 +5,12 @@ import '../../components/auth/Auth.css'
 import Button from '../../components/ui/Button.jsx'
 import { useAuth } from '../../context/AuthContext.jsx'
 import {
-  getAccountAddresses,
-  removeAccountAddress,
-  setDefaultAccountAddress,
-  upsertAccountAddress,
-} from '../../data/account.js'
+  getAddresses,
+  createAddress,
+  updateAddress,
+  deleteAddress,
+  setDefaultAddress,
+} from '../../api/addresses.js'
 import { nameError, phoneError } from '../../utils/authValidation.js'
 import AccountLoginPrompt from './AccountLoginPrompt.jsx'
 import { EmptyState } from './OrderList.jsx'
@@ -191,19 +192,37 @@ function AddressCard({ address, pendingDelete, onEdit, onDelete, onConfirmDelete
 
 function Addresses() {
   const { user } = useAuth()
-  const [tick, setTick] = useState(0)
-  const addresses = useMemo(() => {
-    const list = user ? getAccountAddresses(user) : []
-    return [...list].sort((a, b) => Number(b.isDefault) - Number(a.isDefault))
-  }, [user, tick])
+  const [addresses, setAddresses] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [apiError, setApiError] = useState('')
   const [form, setForm] = useState(emptyForm)
   const [touched, setTouched] = useState({})
   const [open, setOpen] = useState(false)
   const [pendingDelete, setPendingDelete] = useState('')
 
-  function refresh() {
-    setTick((value) => value + 1)
-  }
+  // Load addresses from backend
+  useEffect(() => {
+    if (!user) return
+    setLoading(true)
+    getAddresses()
+      .then((res) => {
+        const list = (res.data || []).map((a) => ({
+          id: a.id,
+          name: a.name,
+          phone: a.phone,
+          street: a.street,
+          city: a.city,
+          state: a.state,
+          pin: a.pin,
+          isDefault: a.isDefault,
+          label: a.label || '',
+        }))
+        setAddresses(list.sort((a, b) => Number(b.isDefault) - Number(a.isDefault)))
+      })
+      .catch((err) => setApiError(err.message || 'Could not load addresses.'))
+      .finally(() => setLoading(false))
+  }, [user])
 
   function closeSheet() {
     setOpen(false)
@@ -265,7 +284,7 @@ function Addresses() {
     }
   }
 
-  function handleSave(event) {
+  async function handleSave(event) {
     event.preventDefault()
     const next = validate()
     setTouched({
@@ -283,28 +302,65 @@ function Addresses() {
       return
     }
 
-    upsertAccountAddress(user, {
-      id: form.id || undefined,
-      name: form.name.trim(),
-      phone: form.phone.trim(),
-      street: form.street.trim(),
-      city: form.city.trim(),
-      state: form.state.trim(),
-      pin: form.pin.trim(),
-    })
-    closeSheet()
-    refresh()
+    setSaving(true)
+    setApiError('')
+    try {
+      const payload = {
+        name: form.name.trim(),
+        phone: form.phone.trim(),
+        street: form.street.trim(),
+        city: form.city.trim(),
+        state: form.state.trim(),
+        pin: form.pin.trim(),
+      }
+      if (form.id) {
+        await updateAddress(form.id, payload)
+      } else {
+        await createAddress(payload)
+      }
+      // Reload addresses
+      const res = await getAddresses()
+      const list = (res.data || []).map((a) => ({
+        id: a.id,
+        name: a.name,
+        phone: a.phone,
+        street: a.street,
+        city: a.city,
+        state: a.state,
+        pin: a.pin,
+        isDefault: a.isDefault,
+        label: a.label || '',
+      }))
+      setAddresses(list.sort((a, b) => Number(b.isDefault) - Number(a.isDefault)))
+      closeSheet()
+    } catch (err) {
+      setApiError(err.message || 'Could not save address.')
+    } finally {
+      setSaving(false)
+    }
   }
 
-  function handleRemove(addressId) {
-    removeAccountAddress(user, addressId)
+  async function handleRemove(addressId) {
+    try {
+      await deleteAddress(addressId)
+      setAddresses((prev) => prev.filter((a) => a.id !== addressId))
+    } catch (err) {
+      setApiError(err.message || 'Could not delete address.')
+    }
     setPendingDelete('')
-    refresh()
   }
 
-  function handleDefault(addressId) {
-    setDefaultAccountAddress(user, addressId)
-    refresh()
+  async function handleDefault(addressId) {
+    try {
+      await setDefaultAddress(addressId)
+      setAddresses((prev) =>
+        prev
+          .map((a) => ({ ...a, isDefault: a.id === addressId }))
+          .sort((a, b) => Number(b.isDefault) - Number(a.isDefault)),
+      )
+    } catch (err) {
+      setApiError(err.message || 'Could not update default.')
+    }
   }
 
   if (!user) {
@@ -330,7 +386,10 @@ function Addresses() {
         </div>
         <p className="address-page__lede">Keep a default address ready so checkout stays simple.</p>
 
-        {addresses.length ? (
+        {apiError ? <p className="orders__error" role="alert">{apiError}</p> : null}
+        {loading ? (
+          <p className="od-note" aria-busy="true">Loading addresses…</p>
+        ) : addresses.length ? (
           <ul className="address-cards">
             {addresses.map((address) => (
               <li key={address.id}>

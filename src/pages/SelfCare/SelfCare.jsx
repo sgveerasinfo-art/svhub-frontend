@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import Reveal from '../../components/ui/Reveal.jsx'
 import {
   selfCareClose,
@@ -7,6 +7,7 @@ import {
   selfCareProducts,
   selfCareStory,
 } from '../../data/selfCare.js'
+import { getProducts } from '../../api/products.js'
 import HomeScroll from '../Home/HomeScroll.jsx'
 import '../Home/Home.css'
 import ShopProduct from '../Shop/ShopProduct.jsx'
@@ -59,6 +60,22 @@ function CareHero() {
 }
 
 function CareCollection() {
+  const [items, setItems] = useState(selfCareProducts)
+
+  useEffect(() => {
+    let cancelled = false
+    getProducts({ storefront: 'self-care', limit: 12 })
+      .then((res) => {
+        if (!cancelled && res?.data?.length) {
+          setItems(res.data)
+        }
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   return (
     <section
       id="handmade-soaps"
@@ -72,10 +89,10 @@ function CareCollection() {
           <p>{selfCareCollectionIntro.copy}</p>
         </Reveal>
 
-        {selfCareProducts.length ? (
+        {items.length ? (
           <Reveal as="ul" className="home-stagger sc-grid">
-            {selfCareProducts.map((product, index) => (
-              <li key={product.id}>
+            {items.map((product, index) => (
+              <li key={product.id || product.slug}>
                 <ShopProduct product={product} index={index} />
               </li>
             ))}
