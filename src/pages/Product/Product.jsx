@@ -7,7 +7,7 @@ import { useCart } from '../../context/CartContext.jsx'
 import { getProduct, getRelatedProducts } from '../../api/products.js'
 import { getCategoryBySlug } from '../../data/categories.js'
 import { getStorefront } from '../../data/storefronts.js'
-import { defaultShipping } from '../../data/productDetails.js'
+import { defaultShipping, readViewed, rememberViewed } from '../../data/productDetails.js'
 import ShopProduct from '../Shop/ShopProduct.jsx'
 import { formatPrice } from '../../utils/money.js'
 import './Product.css'
@@ -281,6 +281,12 @@ function ProductView({ product, related }) {
     { icon: <IconLock />, text: product.shipping.notes[2] },
     { icon: <IconCheck />, text: 'Packed in Coimbatore' },
   ].filter((item) => item.text)
+
+  useEffect(() => {
+    if (product?.id) {
+      rememberViewed(product.id)
+    }
+  }, [product?.id])
 
   useEffect(() => {
     const media = window.matchMedia('(max-width: 959px)')

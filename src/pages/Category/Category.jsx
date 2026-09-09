@@ -206,11 +206,11 @@ function Category() {
   }, [page])
 
   useEffect(() => {
-    if (booting || results.length === 0) return
+    if (booting || products.length === 0) return
     if (filters.page > totalPages) {
       applyFilters({ ...filters, q: queryDraft, page: totalPages })
     }
-  }, [booting, filters, queryDraft, results.length, totalPages, applyFilters])
+  }, [booting, filters, queryDraft, products.length, totalPages, applyFilters])
 
   function clearFilters() {
     setQueryDraft('')
