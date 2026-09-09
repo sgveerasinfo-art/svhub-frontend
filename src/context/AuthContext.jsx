@@ -75,6 +75,7 @@ export function AuthProvider({ children }) {
       const path = window.location.pathname
       const onAuthScreen =
         path === '/login' ||
+        path === '/admin/login' ||
         path === '/register' ||
         path === '/forgot-password' ||
         path === '/reset-password'

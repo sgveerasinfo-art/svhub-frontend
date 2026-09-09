@@ -180,6 +180,7 @@ function ownerIdOf(user) {
 
 export function orderIdFromNumber(number) {
   return String(number || '')
+    .replace(/^order\s*#?/i, '')
     .replace(/^#/, '')
     .trim()
     .toLowerCase()

@@ -1,0 +1,115 @@
+/* System States Interactive Gallery Styles */
+
+.sys-showcase {
+  display: grid;
+  gap: 28px;
+  padding: clamp(24px, 4vw, 48px) clamp(16px, 3vw, 36px);
+  background: var(--off-white);
+  min-height: calc(100vh - 120px);
+  font-family: var(--font-body);
+}
+
+.sys-showcase-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--admin-line);
+}
+
+.sys-showcase-header h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(28px, 3vw, 38px);
+  color: var(--charcoal-green);
+}
+
+.sys-showcase-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.sys-nav-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: var(--white);
+  border: 1px solid var(--admin-line);
+  color: var(--admin-ink);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.sys-nav-pill:hover {
+  background: rgba(110, 140, 40, 0.08);
+  border-color: var(--sv-green);
+  color: var(--leaf-green);
+}
+
+.sys-nav-pill.is-active {
+  background: var(--charcoal-green);
+  color: #FAF7F2;
+  border-color: var(--charcoal-green);
+  font-weight: 600;
+}
+
+.sys-preview-stage {
+  background: var(--white);
+  border: 1px solid var(--admin-line);
+  border-radius: 16px;
+  padding: clamp(20px, 4vw, 44px);
+  box-shadow: 0 4px 16px rgba(44, 44, 44, 0.04);
+  position: relative;
+  min-height: 480px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sys-stage-controls {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(250, 247, 242, 0.95);
+  border: 1px solid var(--admin-line);
+  padding: 4px 8px;
+  border-radius: 8px;
+  font-size: 12px;
+  z-index: 10;
+}
+
+.sys-stage-controls button {
+  border: 0;
+  background: transparent;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  color: var(--admin-mute);
+}
+
+.sys-stage-controls button.is-active {
+  background: var(--white);
+  color: var(--admin-ink);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.sys-toast-tray {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 120;
+  display: grid;
+  gap: 10px;
+}
