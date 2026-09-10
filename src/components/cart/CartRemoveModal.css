@@ -1,0 +1,351 @@
+/* ==========================================================================
+   SV Hub Cart Item Removal Modal
+   Custom, minimal, earthy SV Hub brand identity.
+   Fully responsive on both mobile and large screens.
+   ========================================================================== */
+
+.sv-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background-color: rgba(44, 44, 44, 0.52);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  animation: svModalFadeIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.sv-modal-overlay.is-closing {
+  animation: svModalFadeOut 0.2s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+}
+
+.sv-modal-card {
+  position: relative;
+  width: 100%;
+  max-width: 440px;
+  background: var(--white, #ffffff);
+  border: 1px solid rgba(197, 200, 181, 0.45);
+  border-radius: 20px;
+  box-shadow:
+    0 24px 60px -12px rgba(44, 44, 44, 0.22),
+    0 0 0 1px rgba(197, 200, 181, 0.15);
+  overflow: hidden;
+  text-align: center;
+  user-select: none;
+  animation: svModalScaleIn 0.26s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transform-origin: center center;
+}
+
+.sv-modal-card.is-closing {
+  animation: svModalScaleOut 0.2s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+}
+
+/* Close Icon Button in top right */
+.sv-modal-close-btn {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--cart-outline-text, #757968);
+  cursor: pointer;
+  transition:
+    color 150ms ease,
+    background-color 150ms ease;
+  z-index: 2;
+}
+
+.sv-modal-close-btn:hover {
+  color: var(--charcoal-green, #3b4632);
+  background: rgba(197, 200, 181, 0.2);
+}
+
+.sv-modal-body {
+  padding: 28px 24px 24px;
+}
+
+/* Product Preview Pill */
+.sv-modal-preview {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 14px;
+  background: #fbf9f5;
+  border: 1px solid rgba(197, 200, 181, 0.38);
+  border-radius: 14px;
+  margin-bottom: 20px;
+  text-align: left;
+}
+
+.sv-modal-thumb {
+  width: 52px;
+  height: 52px;
+  border-radius: 10px;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: #e9e8e4;
+  border: 1px solid rgba(197, 200, 181, 0.3);
+}
+
+.sv-modal-item-info {
+  min-width: 0;
+  flex: 1;
+}
+
+.sv-modal-item-name {
+  display: block;
+  font-family: var(--font-display, 'DM Serif Text', Georgia, serif);
+  font-size: 16px;
+  font-weight: 400;
+  color: var(--espresso-brown, #532f1a);
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sv-modal-item-meta {
+  display: block;
+  font-family: var(--font-body, 'Poppins', sans-serif);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--cart-muted, #444839);
+  line-height: 1.3;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sv-modal-item-price {
+  display: inline-block;
+  font-family: var(--font-body, 'Poppins', sans-serif);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--cart-primary, #4a6400);
+  margin-top: 4px;
+}
+
+/* Modal Title & Message */
+.sv-modal-title {
+  font-family: var(--font-display, 'DM Serif Text', Georgia, serif);
+  font-size: 24px;
+  font-weight: 400;
+  line-height: 32px;
+  color: var(--espresso-brown, #532f1a);
+  margin: 0 0 8px;
+}
+
+.sv-modal-message {
+  font-family: var(--font-body, 'Poppins', sans-serif);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 22px;
+  color: var(--cart-muted, #444839);
+  margin: 0 0 24px;
+  padding-inline: 8px;
+}
+
+/* SV Hub Brand Buttons */
+.sv-modal-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sv-modal-btn {
+  flex: 1;
+  min-height: 48px;
+  padding: 12px 20px;
+  border-radius: 999px;
+  font-family: var(--font-body, 'Poppins', sans-serif);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    background-color 200ms ease,
+    border-color 200ms ease,
+    color 200ms ease,
+    box-shadow 200ms ease,
+    transform 150ms ease;
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Cancel Button: Earthy Outlined Pill */
+.sv-modal-btn--cancel {
+  border: 1.5px solid rgba(59, 70, 50, 0.22);
+  background: transparent;
+  color: var(--charcoal-green, #3b4632);
+}
+
+.sv-modal-btn--cancel:hover {
+  background: rgba(59, 70, 50, 0.06);
+  border-color: var(--charcoal-green, #3b4632);
+}
+
+.sv-modal-btn--cancel:active {
+  background: rgba(59, 70, 50, 0.1);
+  transform: scale(0.98);
+}
+
+/* OK Button: Rich Crimson / Brand Error Pill */
+.sv-modal-btn--confirm {
+  border: 0;
+  background: var(--cart-error, #ba1a1a);
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(186, 26, 26, 0.25);
+}
+
+.sv-modal-btn--confirm:hover {
+  background: #9f1515;
+  box-shadow: 0 6px 18px rgba(186, 26, 26, 0.32);
+  transform: translateY(-1px);
+}
+
+.sv-modal-btn--confirm:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(186, 26, 26, 0.25);
+}
+
+.sv-modal-btn:focus-visible {
+  outline: 2px solid var(--cart-primary, #4a6400);
+  outline-offset: 2px;
+}
+
+/* ==========================================================================
+   Animations
+   ========================================================================== */
+
+@keyframes svModalFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes svModalFadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes svModalScaleIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes svModalScaleOut {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+}
+
+/* ==========================================================================
+   Responsive Adaptations
+   ========================================================================== */
+
+/* Large Desktop Screens (min-width: 1024px) */
+@media (min-width: 1024px) {
+  .sv-modal-card {
+    max-width: 460px;
+    border-radius: 22px;
+  }
+
+  .sv-modal-body {
+    padding: 32px 28px 28px;
+  }
+
+  .sv-modal-thumb {
+    width: 56px;
+    height: 56px;
+    border-radius: 12px;
+  }
+
+  .sv-modal-title {
+    font-size: 26px;
+    line-height: 34px;
+    margin-bottom: 10px;
+  }
+
+  .sv-modal-message {
+    font-size: 15px;
+    line-height: 24px;
+    margin-bottom: 28px;
+  }
+
+  .sv-modal-btn {
+    min-height: 50px;
+    font-size: 14px;
+  }
+}
+
+/* Mobile Screens (< 480px) */
+@media (max-width: 480px) {
+  .sv-modal-overlay {
+    padding: 16px;
+  }
+
+  .sv-modal-card {
+    max-width: 350px;
+    border-radius: 18px;
+  }
+
+  .sv-modal-body {
+    padding: 24px 18px 18px;
+  }
+
+  .sv-modal-thumb {
+    width: 46px;
+    height: 46px;
+  }
+
+  .sv-modal-title {
+    font-size: 20px;
+    line-height: 26px;
+  }
+
+  .sv-modal-message {
+    font-size: 13px;
+    line-height: 20px;
+    margin-bottom: 20px;
+  }
+
+  .sv-modal-btn {
+    min-height: 46px;
+    font-size: 12px;
+    padding: 10px 16px;
+  }
+}

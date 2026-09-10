@@ -1,14 +1,19 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { useCart } from '../../context/CartContext.jsx'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { createOrder } from '../../api/orders.js'
+import { createRazorpayOrder, verifyRazorpayPayment, recordPaymentFailure } from '../../api/payments.js'
+import { getAddresses, createAddress, updateAddress, deleteAddress } from '../../api/addresses.js'
+import CheckoutAddressCard from './CheckoutAddressCard.jsx'
+import CheckoutAddressForm from './CheckoutAddressForm.jsx'
+import LocationPicker from './LocationPicker.jsx'
+import { loadRazorpayScript } from '../../lib/razorpay.js'
 import { formatPrice } from '../../utils/money.js'
 import './Checkout.css'
 
 const STANDARD = 40
 const EXPRESS = 120
-const STATES = ['Tamil Nadu', 'Kerala', 'Karnataka', 'Andhra Pradesh', 'Telangana', 'Puducherry']
 const STATE_SHORT = {
   'Tamil Nadu': 'TN',
   Kerala: 'KL',
@@ -20,15 +25,8 @@ const STATE_SHORT = {
 
 const emptyForm = {
   name: '',
-  firstName: '',
-  lastName: '',
   email: '',
   phone: '',
-  street: '',
-  apt: '',
-  city: '',
-  state: '',
-  pin: '',
   delivery: 'standard',
   payMethod: 'card',
   cardNumber: '',
@@ -76,15 +74,6 @@ function IconVerified() {
   )
 }
 
-function IconError() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <circle cx="12" cy="12" r="8.5" stroke="currentColor" strokeWidth="1.6" />
-      <path d="M12 8v4.5M12 16.2v.4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-    </svg>
-  )
-}
-
 function IconCard() {
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -111,10 +100,6 @@ function emailOk(value) {
 function phoneOk(value) {
   const digits = value.replace(/\D/g, '')
   return digits.length === 10 || (digits.length === 12 && digits.startsWith('91'))
-}
-
-function pinOk(value) {
-  return /^\d{6}$/.test(value.trim())
 }
 
 function Field({ id, label, error, className = '', children }) {
@@ -151,19 +136,76 @@ function StepHead({ step, mobileStep, title, mobileTitle }) {
 }
 
 function Checkout() {
-  const { items, clearCart } = useCart()
+  const { items, clearCart, loading: cartLoading } = useCart()
   const { user } = useAuth()
   const navigate = useNavigate()
   const [form, setForm] = useState(emptyForm)
   const [errors, setErrors] = useState({})
-  const [pinTouched, setPinTouched] = useState(false)
   const [placed, setPlaced] = useState(null)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
 
+  // Saved Address States
+  const [savedAddresses, setSavedAddresses] = useState([])
+  const [loadingAddresses, setLoadingAddresses] = useState(Boolean(user))
+  const [addressFetchError, setAddressFetchError] = useState('')
+  const [selectedAddressId, setSelectedAddressId] = useState(null)
+  const [addressFlow, setAddressFlow] = useState(null) // null | 'location-picker' | 'form'
+  const [editingAddress, setEditingAddress] = useState(null)
+  const [deleteConfirmId, setDeleteConfirmId] = useState(null)
+  const [addressSaveLoading, setAddressSaveLoading] = useState(false)
+  const [addressSelectionError, setAddressSelectionError] = useState('')
+  const [guestAddress, setGuestAddress] = useState(null)
+
   useEffect(() => {
     window.scrollTo(0, 0)
   }, [])
+
+  // Prefill user details
+  useEffect(() => {
+    if (user) {
+      setForm((prev) => ({
+        ...prev,
+        name: prev.name || user.name || '',
+        email: prev.email || user.email || '',
+        phone: prev.phone || user.phone || '',
+      }))
+    }
+  }, [user])
+
+  // Fetch saved delivery addresses for authenticated customer
+  const fetchAddresses = useCallback(async () => {
+    if (!user) {
+      setLoadingAddresses(false)
+      return
+    }
+    setLoadingAddresses(true)
+    setAddressFetchError('')
+    try {
+      const res = await getAddresses()
+      const list = res?.data || []
+      setSavedAddresses(list)
+      if (list.length > 0) {
+        setSelectedAddressId((current) => {
+          if (current && list.some((a) => (a.id || a._id) === current)) {
+            return current
+          }
+          const def = list.find((a) => a.isDefault) || list[0]
+          return def.id || def._id
+        })
+      } else {
+        setSelectedAddressId(null)
+      }
+    } catch {
+      setAddressFetchError('Unable to load saved addresses.')
+    } finally {
+      setLoadingAddresses(false)
+    }
+  }, [user])
+
+  useEffect(() => {
+    fetchAddresses()
+  }, [fetchAddresses])
 
   const shipping = form.delivery === 'express' ? EXPRESS : STANDARD
   const subtotal = useMemo(
@@ -178,100 +220,367 @@ function Checkout() {
   }
 
   function fullName() {
-    return form.name.trim() || `${form.firstName.trim()} ${form.lastName.trim()}`.trim()
+    return form.name.trim()
+  }
+
+  const handleSelectAddress = useCallback(
+    (id) => {
+      setSelectedAddressId(id)
+      setAddressSelectionError('')
+      const addr =
+        savedAddresses.find((a) => (a.id || a._id) === id) ||
+        (guestAddress?.id === id ? guestAddress : null)
+      if (addr) {
+        setForm((prev) => ({
+          ...prev,
+          name: prev.name || addr.name || addr.fullName || '',
+          phone: prev.phone || addr.phone || '',
+        }))
+      }
+    },
+    [savedAddresses, guestAddress],
+  )
+
+  function handleAddNewAddress() {
+    setEditingAddress(null)
+    setAddressFlow('location-picker')
+    setAddressSelectionError('')
+  }
+
+  function handleEditAddress(addr) {
+    setEditingAddress(addr)
+    setAddressFlow('form')
+    setAddressSelectionError('')
+  }
+
+  function handleCancelAddressFlow() {
+    setAddressFlow(null)
+    setEditingAddress(null)
+  }
+
+  async function handleSaveAddress(formData) {
+    setAddressSaveLoading(true)
+    try {
+      const isEditing = Boolean(formData.id)
+      const lat = Number.isFinite(Number(formData.latitude)) ? Number(formData.latitude) : null
+      const lng = Number.isFinite(Number(formData.longitude)) ? Number(formData.longitude) : null
+
+      if (user && formData.saveForFuture !== false) {
+        const payload = {
+          label: formData.label || 'Home',
+          name: formData.name.trim(),
+          phone: formData.phone.trim(),
+          house: (formData.house || '').trim(),
+          street: (formData.street || '').trim() || (formData.house || '').trim(),
+          area: (formData.area || '').trim(),
+          landmark: (formData.landmark || '').trim(),
+          city: formData.city.trim(),
+          state: formData.state,
+          pin: formData.pin.trim(),
+          latitude: lat,
+          longitude: lng,
+        }
+
+        let savedAddr
+        if (isEditing) {
+          const res = await updateAddress(formData.id, payload)
+          savedAddr = res?.data
+          setSavedAddresses((prev) =>
+            prev.map((a) => ((a.id || a._id) === savedAddr.id ? savedAddr : a)),
+          )
+        } else {
+          const res = await createAddress(payload)
+          savedAddr = res?.data
+          setSavedAddresses((prev) => [savedAddr, ...prev])
+        }
+
+        const newId = savedAddr.id || savedAddr._id
+        setSelectedAddressId(newId)
+        setForm((prev) => ({
+          ...prev,
+          name: prev.name || savedAddr.name,
+          phone: prev.phone || savedAddr.phone,
+        }))
+      } else {
+        const tempAddr = {
+          id: formData.id || 'guest-temp-addr',
+          label: formData.label || 'Home',
+          name: formData.name.trim(),
+          phone: formData.phone.trim(),
+          house: (formData.house || '').trim(),
+          street: (formData.street || '').trim() || (formData.house || '').trim(),
+          area: (formData.area || '').trim(),
+          landmark: (formData.landmark || '').trim(),
+          city: formData.city.trim(),
+          state: formData.state,
+          pin: formData.pin.trim(),
+          country: 'India',
+          latitude: lat,
+          longitude: lng,
+        }
+        setGuestAddress(tempAddr)
+        setSelectedAddressId(tempAddr.id)
+        setForm((prev) => ({
+          ...prev,
+          name: prev.name || tempAddr.name,
+          phone: prev.phone || tempAddr.phone,
+        }))
+      }
+
+      setAddressFlow(null)
+      setEditingAddress(null)
+      setAddressSelectionError('')
+    } finally {
+      setAddressSaveLoading(false)
+    }
+  }
+
+  async function handleConfirmDelete(id) {
+    try {
+      await deleteAddress(id)
+      const nextList = savedAddresses.filter((a) => (a.id || a._id) !== id)
+      setSavedAddresses(nextList)
+      setDeleteConfirmId(null)
+
+      if (selectedAddressId === id) {
+        if (nextList.length > 0) {
+          const nextDef = nextList.find((a) => a.isDefault) || nextList[0]
+          setSelectedAddressId(nextDef.id || nextDef._id)
+        } else {
+          setSelectedAddressId(null)
+        }
+      }
+    } catch (err) {
+      console.error('Failed to delete address:', err)
+      setDeleteConfirmId(null)
+    }
   }
 
   function validate() {
     const next = {}
     if (!fullName()) next.name = 'Enter your name.'
-    if (!form.firstName.trim() && !form.name.trim()) next.firstName = 'Required'
-    if (!form.lastName.trim() && !form.name.trim()) next.lastName = 'Required'
     if (!emailOk(form.email)) next.email = 'Enter a valid email address.'
     if (!phoneOk(form.phone)) next.phone = 'Enter a 10-digit mobile number.'
-    if (!form.street.trim()) next.street = 'Enter your street address.'
-    if (!form.city.trim()) next.city = 'Enter your city.'
-    if (!form.state) next.state = 'Select your state.'
-    if (!pinOk(form.pin)) next.pin = 'Please enter a valid 6-digit numeric PIN code.'
-    setPinTouched(true)
+
+    const activeAddress =
+      savedAddresses.find((a) => (a.id || a._id) === selectedAddressId) ||
+      (guestAddress?.id === selectedAddressId ? guestAddress : null)
+
+    if (!activeAddress) {
+      next.address = 'Please select a delivery address to continue.'
+      setAddressSelectionError('Please select a delivery address to continue.')
+    } else {
+      setAddressSelectionError('')
+    }
+
     setErrors(next)
     return Object.keys(next).length === 0
   }
 
   async function handlePay(event) {
-    event.preventDefault()
+    if (event) {
+      event.preventDefault?.()
+      event.stopPropagation?.()
+    }
     if (!validate()) {
-      const first = document.querySelector('.co-field.is-invalid')
-      first?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      const activeAddress =
+        savedAddresses.find((a) => (a.id || a._id) === selectedAddressId) ||
+        (guestAddress?.id === selectedAddressId ? guestAddress : null)
+
+      if (!activeAddress) {
+        document.getElementById('co-delivery-section')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      } else {
+        const first = document.querySelector('.co-field.is-invalid')
+        first?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }
       return
     }
 
-    const street = [form.street.trim(), form.apt.trim()].filter(Boolean).join(', ')
-    const city = form.city.trim()
-    const shippingAddress = {
-      name: fullName(),
-      phone: form.phone.trim(),
-      street,
-      city,
-      state: form.state,
-      pin: form.pin.trim(),
-      country: 'India',
+    const activeAddress =
+      savedAddresses.find((a) => (a.id || a._id) === selectedAddressId) ||
+      (guestAddress?.id === selectedAddressId ? guestAddress : null)
+
+    if (!activeAddress) {
+      setAddressSelectionError('Please select a delivery address to continue.')
+      document.getElementById('co-delivery-section')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      return
     }
+
+    const city = activeAddress.city
+    const state = activeAddress.state
+    const pin = activeAddress.pin
 
     setSubmitting(true)
     setSubmitError('')
     try {
-      const res = await createOrder({
-        shippingAddress,
+      const isSaved = activeAddress.id && activeAddress.id !== 'guest-temp-addr'
+      const streetLine = [activeAddress.house, activeAddress.street, activeAddress.area].filter(Boolean).join(', ') || activeAddress.street
+
+      const orderPayload = {
         shippingMethod: form.delivery === 'express' ? 'express' : 'standard',
-      })
+        ...(isSaved
+          ? { addressId: activeAddress.id }
+          : {
+              shippingAddress: {
+                name: activeAddress.name || fullName(),
+                phone: activeAddress.phone || form.phone.trim(),
+                house: activeAddress.house || '',
+                street: activeAddress.street,
+                area: activeAddress.area || '',
+                landmark: activeAddress.landmark || '',
+                city: activeAddress.city,
+                state: activeAddress.state,
+                pin: activeAddress.pin,
+                country: activeAddress.country || 'India',
+                latitude: activeAddress.latitude ?? null,
+                longitude: activeAddress.longitude ?? null,
+              },
+            }),
+      }
+
+      // 1. Create authoritative SV Hub Order in MongoDB (status: PENDING_PAYMENT)
+      const res = await createOrder(orderPayload)
       const orderData = res.data
-      const successState = {
-        orderNumber: orderData.orderNumber,
-        total: orderData.totalAmount,
-        date: orderData.createdAt,
-        city: `${city}, ${STATE_SHORT[form.state] || form.state}`,
-        email: user?.email || form.email.trim(),
-        subtotal: orderData.subtotal,
-        shipping: orderData.shippingFee,
-        discount: orderData.discount || 0,
-        amount: orderData.totalAmount,
-        status: 'Pending',
-        paymentStatus: 'Pending',
-        addressLines: [street, `${city}, ${form.state}`, form.pin.trim()],
-        address: {
-          name: fullName(),
-          phone: form.phone.trim(),
-          lines: [street, `${city}, ${form.state}`, form.pin.trim()],
+
+      // 2. Load official Razorpay Checkout SDK dynamically
+      const scriptLoaded = await loadRazorpayScript()
+      if (!scriptLoaded || !window.Razorpay) {
+        throw new Error('Razorpay Checkout could not be loaded. Please verify your connection.')
+      }
+
+      // 3. Request server to create Razorpay Order
+      const rzpRes = await createRazorpayOrder(orderData.id)
+      const rzpData = rzpRes.data
+
+      // 4. Configure Razorpay Standard Checkout modal
+      const options = {
+        key: rzpData.keyId,
+        amount: rzpData.amount,
+        currency: rzpData.currency || 'INR',
+        name: 'SV Hub',
+        description: `Order ${orderData.orderNumber}`,
+        order_id: rzpData.razorpayOrderId,
+        prefill: {
+          name: rzpData.customer?.name || activeAddress.name || fullName(),
+          email: rzpData.customer?.email || form.email.trim(),
+          contact: rzpData.customer?.phone || activeAddress.phone || form.phone.trim(),
         },
-        items: (orderData.items || []).map((item) => ({
-          name: item.productName,
-          weight: item.variantLabel || item.weight || '',
-          quantity: item.quantity,
-          price: item.unitPrice,
-          image: item.image || '',
-        })),
+        theme: {
+          color: '#16a34a',
+        },
+        handler: async function (response) {
+          try {
+            setSubmitting(true)
+            // 5. Server-side signature verification, stock deduction, and order confirmation
+            const verifyRes = await verifyRazorpayPayment({
+              orderId: orderData.id,
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+            })
+
+            const confirmedOrder = verifyRes.data?.order || orderData
+
+            // 6. Only clear customer cart after verified payment and confirmation
+            await clearCart()
+
+            const successState = {
+              orderId: confirmedOrder.id || orderData.id,
+              orderNumber: confirmedOrder.orderNumber || orderData.orderNumber,
+              total: confirmedOrder.totalAmount ?? orderData.totalAmount,
+              date: confirmedOrder.createdAt || orderData.createdAt,
+              city: `${city}, ${STATE_SHORT[state] || state}`,
+              email: confirmedOrder.email || user?.email || form.email.trim(),
+              subtotal: confirmedOrder.subtotal ?? orderData.subtotal,
+              shipping: confirmedOrder.shippingFee ?? orderData.shippingFee,
+              discount: confirmedOrder.discount || 0,
+              amount: confirmedOrder.totalAmount ?? orderData.totalAmount,
+              status: confirmedOrder.status || 'CONFIRMED',
+              paymentStatus: confirmedOrder.paymentStatus || 'SUCCESS',
+              addressLines: [streetLine, `${city}, ${state}`, pin],
+              address: {
+                name: activeAddress.name || fullName(),
+                phone: activeAddress.phone || form.phone.trim(),
+                lines: [streetLine, `${city}, ${state}`, pin],
+              },
+              items: (confirmedOrder.items || orderData.items || []).map((item) => ({
+                name: item.productName || item.name,
+                weight: item.variantLabel || item.weight || '',
+                quantity: item.quantity,
+                price: item.unitPrice || item.price,
+                image: item.image || '',
+              })),
+            }
+
+            try {
+              sessionStorage.setItem('svhub.lastOrder', JSON.stringify(successState))
+            } catch {
+              /* ignore storage exceptions */
+            }
+
+            setPlaced(successState)
+            navigate('/order-success', { state: successState, replace: true })
+          } catch (verifyErr) {
+            setSubmitError(verifyErr.message || 'Payment verification failed. Please try again.')
+            window.scrollTo({ top: 0, behavior: 'smooth' })
+          } finally {
+            setSubmitting(false)
+          }
+        },
+        modal: {
+          ondismiss: async function () {
+            setSubmitting(false)
+            setSubmitError('Payment was cancelled. Your items are still safely saved in your cart.')
+            await recordPaymentFailure({
+              orderId: orderData.id,
+              razorpay_order_id: rzpData.razorpayOrderId,
+              errorReason: 'Customer closed payment checkout modal',
+            }).catch(() => {})
+          },
+        },
       }
 
-      try {
-        sessionStorage.setItem('svhub.lastOrder', JSON.stringify(successState))
-      } catch {
-        /* ignore quota / private mode */
-      }
+      const rzpInstance = new window.Razorpay(options)
+      rzpInstance.on('payment.failed', async function (failedResponse) {
+        setSubmitting(false)
+        const reason = failedResponse.error?.description || failedResponse.error?.reason || 'Payment failed'
+        setSubmitError(`Payment failed: ${reason}. Your items remain in your cart.`)
+        await recordPaymentFailure({
+          orderId: orderData.id,
+          razorpay_order_id: rzpData.razorpayOrderId,
+          errorReason: reason,
+        }).catch(() => {})
+      })
 
-      setPlaced(successState)
-      await clearCart()
-      navigate('/order-success', { state: successState, replace: true })
+      rzpInstance.open()
     } catch (err) {
-      setSubmitError(err.message || 'Could not place order. Please try again.')
+      setSubmitError(err.message || 'Could not initiate payment. Please try again.')
       window.scrollTo({ top: 0, behavior: 'smooth' })
-    } finally {
       setSubmitting(false)
     }
   }
 
-  const pinError = pinTouched && form.pin !== '' && !pinOk(form.pin) ? 'Please enter a valid 6-digit numeric PIN code.' : errors.pin
+  if (!placed && cartLoading && items.length === 0) {
+    return (
+      <div className="co">
+        <header className="co-top">
+          <Link to="/cart" className="co-back">
+            <IconBack />
+            Back to cart
+          </Link>
+          <Link to="/" className="co-brand">
+            SV Hub
+          </Link>
+          <span className="co-top__spacer" aria-hidden="true" />
+        </header>
+        <main className="co-main" style={{ display: 'grid', placeItems: 'center', minHeight: '50vh' }}>
+          <div className="co-loc-search-spinner" style={{ width: '36px', height: '36px' }} />
+        </main>
+      </div>
+    )
+  }
 
-  if (!placed && items.length === 0) {
+  if (!placed && !cartLoading && items.length === 0) {
     return <Navigate to="/cart" replace />
   }
 
@@ -322,9 +631,15 @@ function Checkout() {
           <dd>{formatPrice(total)}</dd>
         </div>
       </dl>
-      <button type="submit" form="checkout-form" className="co-pay co-pay--desk">
+      <button
+        type="button"
+        onClick={handlePay}
+        className="co-pay co-pay--desk"
+        disabled={submitting}
+        aria-busy={submitting}
+      >
         <IconLock />
-        Pay Securely
+        {submitting ? 'Placing order…' : 'Pay Securely'}
       </button>
       <p className="co-ssl">
         <IconVerified /> 256-bit SSL Encryption
@@ -359,11 +674,12 @@ function Checkout() {
             <section className="co-card">
               <StepHead step="1" title="Customer Information" mobileTitle="Customer Info" />
               <div className="co-fields">
-                <Field id="co-name" label="Full Name" error={errors.name} className="is-wide is-desk">
+                <Field id="co-name" label="Full Name" error={errors.name} className="is-wide">
                   <input
                     id="co-name"
                     name="name"
                     autoComplete="name"
+                    placeholder="Full Name"
                     value={form.name}
                     onChange={(event) => setValue('name', event.target.value)}
                   />
@@ -394,114 +710,106 @@ function Checkout() {
               </div>
             </section>
 
-            <section className="co-card">
+            <section className="co-card" id="co-delivery-section">
               <StepHead step="2" title="Delivery Address" />
-              <div className="co-fields">
-                <Field id="co-first" label="First Name" error={errors.firstName} className="is-half is-mob">
-                  <input
-                    id="co-first"
-                    name="firstName"
-                    autoComplete="given-name"
-                    placeholder="First Name"
-                    value={form.firstName}
-                    onChange={(event) => setValue('firstName', event.target.value)}
-                  />
-                </Field>
-                <Field id="co-last" label="Last Name" error={errors.lastName} className="is-half is-mob">
-                  <input
-                    id="co-last"
-                    name="lastName"
-                    autoComplete="family-name"
-                    placeholder="Last Name"
-                    value={form.lastName}
-                    onChange={(event) => setValue('lastName', event.target.value)}
-                  />
-                </Field>
-                <Field id="co-street" label="Street Address" error={errors.street} className="is-wide">
-                  <input
-                    id="co-street"
-                    name="street"
-                    autoComplete="street-address"
-                    placeholder="Street Address"
-                    value={form.street}
-                    onChange={(event) => setValue('street', event.target.value)}
-                  />
-                </Field>
-                <Field id="co-apt" label="Apartment" className="is-wide is-mob">
-                  <input
-                    id="co-apt"
-                    name="apt"
-                    autoComplete="address-line2"
-                    placeholder="Apt, Suite, etc. (Optional)"
-                    value={form.apt}
-                    onChange={(event) => setValue('apt', event.target.value)}
-                  />
-                </Field>
-                <Field id="co-city" label="City" error={errors.city}>
-                  <input
-                    id="co-city"
-                    name="city"
-                    autoComplete="address-level2"
-                    placeholder="City"
-                    value={form.city}
-                    onChange={(event) => setValue('city', event.target.value)}
-                  />
-                </Field>
-                <Field id="co-pin-mob" label="Postal Code" error={pinError} className="is-mob">
-                  <input
-                    id="co-pin-mob"
-                    name="postal-mobile"
-                    inputMode="numeric"
-                    autoComplete="postal-code"
-                    placeholder="Postal Code"
-                    maxLength={6}
-                    value={form.pin}
-                    onBlur={() => setPinTouched(true)}
-                    onChange={(event) => {
-                      setPinTouched(true)
-                      setValue('pin', event.target.value.replace(/\D/g, '').slice(0, 6))
-                    }}
-                  />
-                </Field>
-                <Field id="co-state" label="State" error={errors.state} className="is-mobile-wide">
-                  <select
-                    id="co-state"
-                    name="state"
-                    autoComplete="address-level1"
-                    value={form.state}
-                    onChange={(event) => setValue('state', event.target.value)}
-                  >
-                    <option value="">Select state</option>
-                    {STATES.map((state) => (
-                      <option key={state} value={state}>
-                        {state}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-                <Field id="co-pin" label="PIN Code" error={pinError} className="is-wide is-desk">
-                  <div className="co-pin">
-                    <input
-                      id="co-pin"
-                      name="postal"
-                      inputMode="numeric"
-                      autoComplete="postal-code"
-                      maxLength={6}
-                      value={form.pin}
-                      onBlur={() => setPinTouched(true)}
-                      onChange={(event) => {
-                        setPinTouched(true)
-                        setValue('pin', event.target.value.replace(/\D/g, '').slice(0, 6))
-                      }}
-                    />
-                    {pinError ? (
-                      <span className="co-pin__icon" aria-hidden="true">
-                        <IconError />
-                      </span>
-                    ) : null}
+
+              {addressSelectionError && (
+                <p className="co-addr-select-error" role="alert">
+                  {addressSelectionError}
+                </p>
+              )}
+
+              {loadingAddresses ? (
+                <div className="co-addr-skeletons" aria-label="Loading saved addresses">
+                  <div className="co-addr-skeleton" />
+                  <div className="co-addr-skeleton" />
+                </div>
+              ) : addressFetchError ? (
+                <div className="co-addr-error-state" role="alert">
+                  <p>{addressFetchError}</p>
+                  <button type="button" className="co-btn co-btn--outline" onClick={fetchAddresses}>
+                    Try Again
+                  </button>
+                </div>
+              ) : addressFlow === 'location-picker' ? (
+                <LocationPicker
+                  initialLocation={editingAddress}
+                  onSave={handleSaveAddress}
+                  onCancel={handleCancelAddressFlow}
+                  saving={addressSaveLoading}
+                  isAuthenticated={Boolean(user)}
+                  initialUser={user}
+                  onEnterManually={() => {
+                    setEditingAddress(null)
+                    setAddressFlow('form')
+                  }}
+                />
+              ) : addressFlow === 'form' ? (
+                <CheckoutAddressForm
+                  initialData={editingAddress}
+                  onSave={handleSaveAddress}
+                  onCancel={handleCancelAddressFlow}
+                  onChangeLocation={() => setAddressFlow('location-picker')}
+                  saving={addressSaveLoading}
+                  isAuthenticated={Boolean(user)}
+                />
+              ) : savedAddresses.length > 0 || guestAddress ? (
+                <div className="co-addr-section-content">
+                  <p className="co-section-sub">Choose where you want your order delivered.</p>
+                  <div className="co-addr-grid" role="radiogroup" aria-label="Delivery addresses">
+                    {savedAddresses.map((addr) => {
+                      const addrId = addr.id || addr._id
+                      return (
+                        <CheckoutAddressCard
+                          key={addrId}
+                          address={addr}
+                          selected={selectedAddressId === addrId}
+                          onSelect={() => handleSelectAddress(addrId)}
+                          onEdit={() => handleEditAddress(addr)}
+                          onDelete={() => setDeleteConfirmId(addrId)}
+                          isDeleting={deleteConfirmId === addrId}
+                          onConfirmDelete={() => handleConfirmDelete(addrId)}
+                          onCancelDelete={() => setDeleteConfirmId(null)}
+                        />
+                      )
+                    })}
+                    {guestAddress && !savedAddresses.some((a) => (a.id || a._id) === guestAddress.id) && (
+                      <CheckoutAddressCard
+                        key={guestAddress.id}
+                        address={guestAddress}
+                        selected={selectedAddressId === guestAddress.id}
+                        onSelect={() => handleSelectAddress(guestAddress.id)}
+                        onEdit={() => handleEditAddress(guestAddress)}
+                        onDelete={() => {
+                          setGuestAddress(null)
+                          setSelectedAddressId(null)
+                        }}
+                        isDeleting={false}
+                        onConfirmDelete={() => {}}
+                        onCancelDelete={() => {}}
+                      />
+                    )}
                   </div>
-                </Field>
-              </div>
+                  <button
+                    type="button"
+                    className="co-add-addr-btn"
+                    onClick={handleAddNewAddress}
+                  >
+                    + ADD NEW ADDRESS
+                  </button>
+                </div>
+              ) : (
+                <div className="co-addr-empty">
+                  <p className="co-addr-empty__desc">No saved delivery address yet.</p>
+                  <button
+                    type="button"
+                    className="co-btn co-btn--outline co-add-first-addr-btn"
+                    onClick={handleAddNewAddress}
+                  >
+                    + ADD DELIVERY ADDRESS
+                  </button>
+                </div>
+              )}
             </section>
 
             <section className="co-card co-card--delivery">
@@ -641,7 +949,13 @@ function Checkout() {
             {submitError}
           </p>
         ) : null}
-        <button type="submit" form="checkout-form" className="co-pay" disabled={submitting} aria-busy={submitting}>
+        <button
+          type="button"
+          onClick={handlePay}
+          className="co-pay"
+          disabled={submitting}
+          aria-busy={submitting}
+        >
           <IconLock />
           {submitting ? 'Placing order…' : `Pay Securely — ${formatPrice(total)}`}
         </button>

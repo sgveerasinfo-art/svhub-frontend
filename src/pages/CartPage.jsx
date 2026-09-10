@@ -6,6 +6,7 @@ import { productHref } from '../data/products.js'
 import { getFeaturedProducts } from '../api/products.js'
 import { getStorefront } from '../data/storefronts.js'
 import { formatPrice } from '../utils/money.js'
+import CartRemoveModal from '../components/cart/CartRemoveModal.jsx'
 import './CartPage.css'
 
 const MAX_QTY = 12
@@ -244,6 +245,7 @@ function RelatedCard({ product, onAdd }) {
 function CartPage() {
   const { items, count, addItem, setItemQuantity } = useCart()
   const [promo, setPromo] = useState('')
+  const [itemPendingRemoval, setItemPendingRemoval] = useState(null)
   const subtotal = useMemo(
     () => items.reduce((sum, item) => sum + item.price * item.quantity, 0),
     [items],
@@ -298,7 +300,7 @@ function CartPage() {
                   key={lineKey(item)}
                   item={item}
                   onQuantity={(qty) => setItemQuantity(item, qty)}
-                  onRemove={() => setItemQuantity(item, 0)}
+                  onRemove={() => setItemPendingRemoval(item)}
                 />
               ))}
             </div>
@@ -390,6 +392,18 @@ function CartPage() {
           </section>
         ) : null}
       </div>
+
+      {itemPendingRemoval ? (
+        <CartRemoveModal
+          item={itemPendingRemoval}
+          onConfirm={() => {
+            const target = itemPendingRemoval
+            setItemPendingRemoval(null)
+            setItemQuantity(target, 0)
+          }}
+          onCancel={() => setItemPendingRemoval(null)}
+        />
+      ) : null}
     </section>
   )
 }

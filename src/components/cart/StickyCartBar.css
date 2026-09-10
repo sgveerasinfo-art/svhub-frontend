@@ -1,0 +1,276 @@
+/* ==========================================================================
+   SV Hub Sticky "Go to Cart" Bar
+   Native, premium, minimal, earthy brand identity.
+   Works seamlessly across Mobile and Desktop viewports.
+   ========================================================================== */
+
+.sticky-cart-container {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
+  z-index: 1000;
+  pointer-events: none;
+  transform: translateY(100%);
+  opacity: 0;
+  transition:
+    transform 320ms cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 280ms ease;
+  will-change: transform, opacity;
+}
+
+.sticky-cart-container.is-visible {
+  transform: translateY(0);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Mobile Bar Base (Docked) */
+.sticky-cart-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 58px;
+  padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px));
+  background: var(--charcoal-green, #3b4632);
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow:
+    0 -4px 20px rgba(0, 0, 0, 0.18),
+    0 -1px 3px rgba(0, 0, 0, 0.08);
+  text-decoration: none;
+  color: var(--white, #ffffff);
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+.sticky-cart-bar:active {
+  background: #333d2b;
+}
+
+/* Left Section: Icon & Info */
+.sticky-cart-bar__info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.sticky-cart-bar__icon-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+  flex-shrink: 0;
+}
+
+.sticky-cart-bar__badge {
+  position: absolute;
+  top: -4px;
+  right: -5px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--terracotta, #aa5733);
+  color: #ffffff;
+  font-family: var(--font-body);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+  border: 1.5px solid var(--charcoal-green, #3b4632);
+  box-sizing: content-box;
+}
+
+.sticky-cart-bar__summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: #ffffff;
+  white-space: nowrap;
+  transform-origin: left center;
+}
+
+.sticky-cart-bar__summary.is-pulsing {
+  animation: stickyPillPulse 220ms ease;
+}
+
+.sticky-cart-bar__count {
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.sticky-cart-bar__dot {
+  color: rgba(255, 255, 255, 0.38);
+  font-weight: 700;
+}
+
+.sticky-cart-bar__price {
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+/* Right Section: CTA Button */
+.sticky-cart-bar__cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 9px 18px;
+  border-radius: 999px;
+  background: var(--sv-green, #6e8c28);
+  color: #ffffff;
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  flex-shrink: 0;
+  transition:
+    background-color 200ms ease,
+    transform 200ms ease;
+}
+
+.sticky-cart-bar__arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 200ms ease;
+}
+
+.sticky-cart-bar:hover .sticky-cart-bar__cta {
+  background: var(--leaf-green, #56701d);
+}
+
+.sticky-cart-bar:hover .sticky-cart-bar__arrow {
+  transform: translateX(3px);
+}
+
+.sticky-cart-bar:focus-visible {
+  outline: 2px solid var(--sv-green, #6e8c28);
+  outline-offset: -2px;
+}
+
+/* ==========================================================================
+   Desktop & Tablet Floating Layout (min-width: 768px)
+   ========================================================================== */
+
+@media (min-width: 768px) {
+  .sticky-cart-container {
+    bottom: 24px;
+    left: 50%;
+    right: auto;
+    width: calc(100% - 48px);
+    max-width: 480px;
+    transform: translate(-50%, calc(100% + 40px));
+  }
+
+  .sticky-cart-container.is-visible {
+    transform: translate(-50%, 0);
+  }
+
+  .sticky-cart-bar {
+    border-radius: 999px;
+    padding: 10px 14px 10px 18px;
+    min-height: 56px;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    box-shadow:
+      0 16px 36px -4px rgba(43, 52, 36, 0.38),
+      0 4px 12px rgba(0, 0, 0, 0.08);
+    transition:
+      transform 200ms ease,
+      box-shadow 200ms ease;
+  }
+
+  .sticky-cart-bar:hover {
+    transform: translateY(-2px);
+    box-shadow:
+      0 20px 42px -4px rgba(43, 52, 36, 0.44),
+      0 6px 14px rgba(0, 0, 0, 0.1);
+  }
+
+  .sticky-cart-bar:active {
+    transform: translateY(0);
+  }
+
+  .sticky-cart-bar__badge {
+    border-color: var(--charcoal-green, #3b4632);
+  }
+
+  .sticky-cart-bar__summary {
+    font-size: 14px;
+    gap: 10px;
+  }
+
+  .sticky-cart-bar__count {
+    font-size: 13px;
+  }
+
+  .sticky-cart-bar__price {
+    font-size: 16px;
+  }
+
+  .sticky-cart-bar__cta {
+    padding: 10px 22px;
+    font-size: 12px;
+  }
+}
+
+/* ==========================================================================
+   Micro-animations
+   ========================================================================== */
+
+@keyframes stickyPillPulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.08);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Small mobile responsiveness (< 380px) */
+@media (max-width: 380px) {
+  .sticky-cart-bar {
+    padding-inline: 12px;
+    gap: 8px;
+  }
+
+  .sticky-cart-bar__summary {
+    font-size: 12px;
+    gap: 6px;
+  }
+
+  .sticky-cart-bar__count {
+    font-size: 11px;
+  }
+
+  .sticky-cart-bar__price {
+    font-size: 14px;
+  }
+
+  .sticky-cart-bar__cta {
+    padding: 8px 12px;
+    font-size: 11px;
+  }
+}

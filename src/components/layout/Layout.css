@@ -9,3 +9,14 @@
   min-height: 100vh;
   background: var(--white);
 }
+
+/* Responsive clearance so sticky cart bar never covers product controls or pagination */
+.page-frame.has-sticky-cart main {
+  padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+}
+
+@media (min-width: 768px) {
+  .page-frame.has-sticky-cart main {
+    padding-bottom: 96px;
+  }
+}

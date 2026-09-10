@@ -11,8 +11,10 @@ const CartContext = createContext(null)
 // quantity, lineTotal, stock, availableStock, inStock, maxAllowed
 
 function lineKey(item) {
-  // Works for both backend items (itemId + variantId) and guest items (id + weight)
-  return item.itemId ? `${item.productId}::${item.variantId}` : `${item.id}::${item.weight ?? ''}`
+  if (!item) return ''
+  const prodId = item.productId || item.id || item._id || ''
+  const vId = item.variantId || item.weight || ''
+  return `${prodId}::${vId}`
 }
 
 function cartFromBackend(data) {
@@ -24,13 +26,42 @@ function cartFromBackend(data) {
   }
 }
 
+const GUEST_CART_KEY = 'svhub.cart.guest'
+
+function readGuestCart() {
+  try {
+    const raw = window.localStorage.getItem(GUEST_CART_KEY)
+    return raw ? JSON.parse(raw) : []
+  } catch {
+    return []
+  }
+}
+
+function writeGuestCart(cartItems) {
+  try {
+    const guestOnly = (cartItems || []).filter((it) => !it.itemId)
+    if (guestOnly.length > 0) {
+      window.localStorage.setItem(GUEST_CART_KEY, JSON.stringify(guestOnly))
+    } else {
+      window.localStorage.removeItem(GUEST_CART_KEY)
+    }
+  } catch {
+    /* ignore storage errors */
+  }
+}
+
 // ─── Provider ──────────────────────────────────────────────────────────────────
 export function CartProvider({ children }) {
   const { user } = useAuth()
   const prevUserRef = useRef(user)
-  const [items, setItems] = useState([])
+  const [items, setItems] = useState(() => {
+    if (!readToken()) {
+      return readGuestCart()
+    }
+    return []
+  })
   const [subtotal, setSubtotal] = useState(0)
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(() => Boolean(readToken() && user))
   const syncingRef = useRef(false)
 
   const isLoggedIn = useCallback(() => Boolean(readToken() && user), [user])
@@ -59,12 +90,13 @@ export function CartProvider({ children }) {
 
   // ── Merge guest cart on login ────────────────────────────────────────────────
   const mergeGuestCart = useCallback(async (guestItems) => {
-    if (!guestItems?.length) {
+    const itemsToMerge = guestItems?.length ? guestItems : readGuestCart()
+    if (!itemsToMerge?.length) {
       await syncCart()
       return
     }
 
-    const mappable = guestItems
+    const mappable = itemsToMerge
       .map((item) => ({
         productId: item.productId || item.id,
         variantId: item.variantId || (item.weight ? item.weight.replace(/\s+/g, '').toLowerCase() : '500g'),
@@ -73,14 +105,17 @@ export function CartProvider({ children }) {
       .filter((item) => item.productId && item.variantId)
 
     if (!mappable.length) {
+      writeGuestCart([])
       await syncCart()
       return
     }
 
     try {
       const res = await cartApi.mergeCart(mappable)
+      writeGuestCart([])
       applyServerCart(res)
     } catch {
+      writeGuestCart([])
       await syncCart()
     }
   }, [syncCart])
@@ -91,11 +126,13 @@ export function CartProvider({ children }) {
     prevUserRef.current = user
 
     if (!prevUser && user) {
-      // User logged in: merge in-memory guest items if any
+      // User logged in: merge in-memory and stored guest items if any
       setItems((currentItems) => {
         const guestItems = currentItems.filter((it) => !it.itemId)
-        if (guestItems.length > 0) {
-          mergeGuestCart(guestItems)
+        const stored = readGuestCart()
+        const combined = guestItems.length > 0 ? guestItems : stored
+        if (combined.length > 0) {
+          mergeGuestCart(combined)
         } else {
           syncCart()
         }
@@ -103,6 +140,7 @@ export function CartProvider({ children }) {
       })
     } else if (prevUser && !user) {
       // User logged out: clear cart state for strict isolation
+      writeGuestCart([])
       setItems([])
       setSubtotal(0)
     } else if (user) {
@@ -129,16 +167,20 @@ export function CartProvider({ children }) {
     const qty = Math.max(1, Number(quantity) || 1)
 
     if (!isLoggedIn()) {
-      // Guest: in-memory only
+      // Guest: in-memory + localStorage
       setItems((current) => {
         const key = lineKey(product)
         const existing = current.find((item) => lineKey(item) === key)
+        let updated
         if (existing) {
-          return current.map((item) =>
+          updated = current.map((item) =>
             lineKey(item) === key ? { ...item, quantity: item.quantity + qty } : item,
           )
+        } else {
+          updated = [...current, { ...product, quantity: qty }]
         }
-        return [...current, { ...product, quantity: qty }]
+        writeGuestCart(updated)
+        return updated
       })
       return
     }
@@ -172,22 +214,53 @@ export function CartProvider({ children }) {
     const qty = Math.max(0, Number(quantity) || 0)
 
     if (!isLoggedIn()) {
-      // Guest: in-memory only
+      // Guest: in-memory + localStorage
       setItems((current) => {
+        const prodId = product.productId || product.id || product._id
         const key = lineKey(product)
-        if (qty === 0) return current.filter((item) => lineKey(item) !== key)
-        const existing = current.find((item) => lineKey(item) === key)
-        if (existing) {
-          return current.map((item) => (lineKey(item) === key ? { ...item, quantity: qty } : item))
+        let updated
+        if (qty === 0) {
+          updated = current.filter((item) => {
+            const itemProdId = item.productId || item.id || item._id
+            return lineKey(item) !== key && itemProdId !== prodId
+          })
+        } else {
+          const existing = current.find(
+            (item) => lineKey(item) === key || (item.productId || item.id || item._id) === prodId
+          )
+          if (existing) {
+            const matchKey = lineKey(existing)
+            updated = current.map((item) => (lineKey(item) === matchKey ? { ...item, quantity: qty } : item))
+          } else {
+            updated = [...current, { ...product, quantity: qty }]
+          }
         }
-        return [...current, { ...product, quantity: qty }]
+        writeGuestCart(updated)
+        return updated
       })
       return
     }
 
-    // Logged in: use itemId (backend cart line _id)
-    const itemId = product.itemId
-    if (!itemId) return
+    // Logged in: resolve itemId (backend cart line _id)
+    let itemId = product.itemId
+    if (!itemId) {
+      const prodId = product.productId || product.id || product._id
+      const backendItem = items.find(
+        (it) =>
+          it.itemId === product.itemId ||
+          it.productId === prodId ||
+          it.id === prodId ||
+          String(it.productId) === String(prodId) ||
+          String(it.id) === String(prodId) ||
+          (product.slug && it.slug === product.slug)
+      )
+      itemId = backendItem?.itemId
+    }
+
+    if (!itemId) {
+      console.warn('setItemQuantity: could not resolve itemId for product', product)
+      return
+    }
 
     try {
       if (qty === 0) {
@@ -200,25 +273,33 @@ export function CartProvider({ children }) {
     } catch (err) {
       console.error('setItemQuantity failed:', err.message)
     }
-  }, [isLoggedIn])
+  }, [isLoggedIn, items])
 
   // ── Quantity of ──────────────────────────────────────────────────────────────
   const quantityOf = useCallback((product) => {
-    // For logged-in users: search backend cart items by productId
-    const productId = product.productId || product.id
+    // For logged-in users: search backend cart items by productId or slug
+    const productId = product.productId || product.id || product._id
     if (productId) {
-      const backendItem = items.find((item) => item.productId === productId)
+      const backendItem = items.find(
+        (item) =>
+          item.productId === productId ||
+          item.id === productId ||
+          String(item.productId) === String(productId) ||
+          String(item.id) === String(productId) ||
+          (product.slug && item.slug === product.slug)
+      )
       if (backendItem) return backendItem.quantity
     }
     // Fallback for guest cart: check by key
     const key = lineKey(product)
-    return items.find((item) => lineKey(item) === key)?.quantity ?? 0
+    return items.find((item) => lineKey(item) === key || (item.productId || item.id) === productId)?.quantity ?? 0
   }, [items])
 
   // ── Clear cart ───────────────────────────────────────────────────────────────
   const clearCart = useCallback(async () => {
     setItems([])
     setSubtotal(0)
+    writeGuestCart([])
     if (!isLoggedIn()) return
     try {
       await cartApi.clearCart()

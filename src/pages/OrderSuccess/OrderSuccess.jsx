@@ -1,5 +1,6 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
+import { getOrder } from '../../api/orders.js'
 import { orderIdFromNumber } from '../../data/account.js'
 import './OrderSuccess.css'
 
@@ -139,21 +140,43 @@ function IconStar() {
 }
 
 function OrderSuccess() {
-  const { state } = useLocation()
-  const stored = useMemo(readStoredOrder, [])
+  const location = useLocation()
+  const state = location.state
+  const [liveOrder, setLiveOrder] = useState(null)
+
+  const orderId = state?.orderId || new URLSearchParams(location.search).get('orderId')
 
   useEffect(() => {
     document.title = 'Order Confirmed — SV Hub'
     window.scrollTo(0, 0)
+
+    if (orderId) {
+      getOrder(orderId)
+        .then((res) => {
+          if (res.data) setLiveOrder(res.data)
+        })
+        .catch(() => {})
+    }
+
     return () => {
       document.title = 'SV Hub — Pure Native Goodness'
     }
-  }, [])
+  }, [orderId])
+
+  const stored = readStoredOrder()
 
   const order = {
     ...SAMPLE,
     ...(stored || {}),
     ...(state || {}),
+    ...(liveOrder ? {
+      orderNumber: liveOrder.orderNumber,
+      total: liveOrder.totalAmount,
+      date: liveOrder.createdAt,
+      city: liveOrder.shippingAddress?.city ? `${liveOrder.shippingAddress.city}, ${liveOrder.shippingAddress.state}` : SAMPLE.city,
+      addressLines: liveOrder.shippingAddress?.lines || SAMPLE.addressLines,
+      payment: `Paid via Razorpay (${liveOrder.paymentStatus})`,
+    } : {}),
   }
 
   const orderNumber = order.orderNumber || SAMPLE.orderNumber
