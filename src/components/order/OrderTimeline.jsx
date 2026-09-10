@@ -7,11 +7,12 @@ const STEP_LABEL = {
   Confirmed: 'Confirmed',
   Processing: 'Processing',
   Shipped: 'Shipped',
+  'Out for Delivery': 'Out for Delivery',
   Delivered: 'Delivered',
 }
 
 const LAST = Math.max(ORDER_TIMELINE.length - 1, 1)
-const LIVE = new Set(['Processing', 'Shipped'])
+const LIVE = new Set(['Processing', 'Shipped', 'Out for Delivery'])
 
 function CheckIcon() {
   return (

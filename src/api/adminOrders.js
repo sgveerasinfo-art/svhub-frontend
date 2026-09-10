@@ -16,6 +16,7 @@ const STATUS_TO_UI = {
   CONFIRMED: 'Confirmed',
   PROCESSING: 'Processing',
   SHIPPED: 'Shipped',
+  OUT_FOR_DELIVERY: 'Out for Delivery',
   DELIVERED: 'Delivered',
   CANCELLED: 'Cancelled',
   REQUIRES_RECONCILIATION: 'Pending',
@@ -34,6 +35,7 @@ const STATUS_TO_BACKEND = {
   Confirmed: 'CONFIRMED',
   Processing: 'PROCESSING',
   Shipped: 'SHIPPED',
+  'Out for Delivery': 'OUT_FOR_DELIVERY',
   Delivered: 'DELIVERED',
   Cancelled: 'CANCELLED',
 }
@@ -108,6 +110,7 @@ export function normalizeOrderForAdmin(order) {
     shipping: order.shippingFee ?? order.shipping ?? 0,
     shippingFee: order.shippingFee ?? order.shipping ?? 0,
     discount: order.discount ?? 0,
+    expectedDeliveryDate: order.expectedDeliveryDate || null,
     courier: order.courier || null,
     trackingNumber: order.trackingNumber || null,
     notes: order.notes || '',

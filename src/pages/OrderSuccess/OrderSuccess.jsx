@@ -170,6 +170,7 @@ function OrderSuccess() {
     ...(stored || {}),
     ...(state || {}),
     ...(liveOrder ? {
+      id: liveOrder.id,
       orderNumber: liveOrder.orderNumber,
       total: liveOrder.totalAmount,
       date: liveOrder.createdAt,
@@ -180,7 +181,8 @@ function OrderSuccess() {
   }
 
   const orderNumber = order.orderNumber || SAMPLE.orderNumber
-  const orderHref = `/account/orders/${orderIdFromNumber(orderNumber)}`
+  const canonicalOrderId = order.id || order.orderId || orderId || orderIdFromNumber(orderNumber)
+  const orderHref = `/account/orders/${canonicalOrderId}`
   const total = formatMoney(order.total ?? SAMPLE.total)
   const dateLong = formatDate(order.date, 'long')
   const dateShort = formatDate(order.date, 'short')

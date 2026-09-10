@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { formatPrice } from '../../utils/money.js'
 import { getOrder } from '../../api/orders.js'
-import { formatOrderDate } from '../../data/account.js'
+import { formatOrderDate, formatDeliveryDate } from '../../data/account.js'
 import OrderTimeline from '../../components/order/OrderTimeline.jsx'
 import AccountLoginPrompt from './AccountLoginPrompt.jsx'
 import './OrderDetail.css'
@@ -15,6 +15,7 @@ function mapStatus(raw) {
     CONFIRMED: 'Confirmed',
     PROCESSING: 'Processing',
     SHIPPED: 'Shipped',
+    OUT_FOR_DELIVERY: 'Out for Delivery',
     DELIVERED: 'Delivered',
     CANCELLED: 'Cancelled',
   }
@@ -25,6 +26,7 @@ function mapPaymentStatus(raw) {
   const map = {
     PENDING: 'Pending',
     PAID: 'Paid',
+    SUCCESS: 'Paid',
     FAILED: 'Failed',
     REFUNDED: 'Refunded',
   }
@@ -113,6 +115,7 @@ function OrderDetail() {
           number: raw.orderNumber,
           date: raw.createdAt,
           status: mapStatus(raw.status),
+          expectedDeliveryDate: raw.expectedDeliveryDate || null,
           paymentStatus: mapPaymentStatus(raw.paymentStatus),
           payment: raw.paymentMethod || null,
           amount: raw.totalAmount,
@@ -221,6 +224,36 @@ function OrderDetail() {
           <StatusLine label="Order status" value={order.status} />
         </div>
       </header>
+
+      {order.expectedDeliveryDate ? (
+        <section className="od-delivery" aria-label="Delivery Estimation">
+          <div className="od-delivery__badge">
+            <span className="od-delivery__icon" aria-hidden="true">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                <path
+                  d="M3 7.5h11v8H3v-8Zm11 2h4.2L21 13v2.5h-7V9.5Z"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinejoin="round"
+                />
+                <circle cx="7" cy="17.5" r="1.6" stroke="currentColor" strokeWidth="1.6" />
+                <circle cx="17" cy="17.5" r="1.6" stroke="currentColor" strokeWidth="1.6" />
+              </svg>
+            </span>
+            <div className="od-delivery__details">
+              <span className="od-delivery__label">Expected delivery</span>
+              <strong className="od-delivery__date">{formatDeliveryDate(order.expectedDeliveryDate)}</strong>
+            </div>
+          </div>
+          <div className="od-delivery__stage">
+            <span className="od-delivery__stage-label">Current fulfillment stage:</span>
+            <span className="od-delivery__stage-val">
+              <span className="od-delivery__dot" aria-hidden="true" />
+              {order.status}
+            </span>
+          </div>
+        </section>
+      ) : null}
 
       <OrderTimeline status={order.status} />
 

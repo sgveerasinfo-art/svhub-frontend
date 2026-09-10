@@ -4,8 +4,8 @@ const ORDERS_KEY = 'svhub.account.orders'
 const ADDRESSES_KEY = 'svhub.account.addresses'
 const LAST_ORDER_KEY = 'svhub.lastOrder'
 
-export const ORDER_STATUSES = ['Pending', 'Confirmed', 'Processing', 'Shipped', 'Delivered', 'Cancelled']
-export const ORDER_TIMELINE = ['Pending', 'Confirmed', 'Processing', 'Shipped', 'Delivered']
+export const ORDER_STATUSES = ['Pending', 'Confirmed', 'Processing', 'Shipped', 'Out for Delivery', 'Delivered', 'Cancelled']
+export const ORDER_TIMELINE = ['Pending', 'Confirmed', 'Processing', 'Shipped', 'Out for Delivery', 'Delivered']
 export const PAYMENT_STATUSES = ['Pending', 'Paid', 'Failed', 'Refunded']
 
 const SAMPLE_ADDRESS = {
@@ -205,6 +205,7 @@ export function normalizeOrder(raw) {
     subtotal: raw.subtotal == null ? null : Number(raw.subtotal) || 0,
     shipping: raw.shipping == null ? null : Number(raw.shipping) || 0,
     discount: Number(raw.discount) || 0,
+    expectedDeliveryDate: raw.expectedDeliveryDate || null,
     address: raw.address || {
       label: 'Delivery',
       name: raw.addressName || '',
@@ -396,6 +397,17 @@ export function formatOrderDate(value) {
   })
     .format(date)
     .toUpperCase()
+}
+
+export function formatDeliveryDate(value) {
+  const date = value ? new Date(value) : null
+  if (!date || Number.isNaN(date.getTime())) return '—'
+
+  return new Intl.DateTimeFormat('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  }).format(date)
 }
 
 export function statusClass(status) {

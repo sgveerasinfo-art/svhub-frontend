@@ -25,7 +25,17 @@ const DATE_OPTIONS = [
   { value: 'custom', label: 'Custom' },
 ]
 
-const STATUS_FLOW = ['Pending', 'Confirmed', 'Processing', 'Shipped', 'Delivered']
+const STATUS_FLOW = ['Pending', 'Confirmed', 'Processing', 'Shipped', 'Out for Delivery', 'Delivered']
+
+function formatExpectedDate(value) {
+  const date = value ? new Date(value) : null
+  if (!date || Number.isNaN(date.getTime())) return '—'
+  return new Intl.DateTimeFormat('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  }).format(date)
+}
 
 function startOfDay(value) {
   const date = new Date(value)
@@ -125,14 +135,24 @@ function OrderDialog({ eyebrow, title, copy, onClose, children }) {
     }
   }, [onClose])
 
+  const isHashTitle = String(title || '').startsWith('#')
+  const displayTitle = isHashTitle ? (
+    <>
+      <span className="admin-orders-dialog__hash">#</span>
+      {String(title).slice(1)}
+    </>
+  ) : (
+    title
+  )
+
   return createPortal(
     <div className="admin-orders-dialog" role="presentation">
       <button type="button" className="admin-orders-dialog__backdrop" aria-label="Close dialog" onClick={onClose} />
       <div ref={dialogRef} className="admin-orders-dialog__panel" role="dialog" aria-modal="true" aria-labelledby="orders-dialog-title">
         <header className="admin-orders-dialog__head">
-          <div>
-            {eyebrow ? <p className="admin-orders-dialog__eyebrow">{eyebrow}</p> : null}
-            <h2 id="orders-dialog-title">{title}</h2>
+          <div className="admin-orders-dialog__head-content">
+            {eyebrow ? <span className="admin-orders-dialog__eyebrow">{eyebrow}</span> : null}
+            <h2 id="orders-dialog-title">{displayTitle}</h2>
             {copy ? <p className="admin-orders-dialog__copy">{copy}</p> : null}
           </div>
           <button type="button" className="admin-orders-dialog__close" onClick={onClose} aria-label="Close">
@@ -152,60 +172,81 @@ function OrderView({ order, onClose, onEdit, onOpen }) {
     <OrderDialog eyebrow="Order" title={order.number} copy={formatAdminDateTime(order.date)} onClose={onClose}>
       <div className="admin-orders-view">
         <div className="admin-orders-view__hero">
-          <span className="admin-orders__avatar" aria-hidden="true">
-            {initials(order.customerName)}
-          </span>
-          <div>
-            <strong>{order.customerName}</strong>
-            <span>{order.email}</span>
+          <div className="admin-orders-view__customer">
+            <span className="admin-orders__avatar" aria-hidden="true">
+              {initials(order.customerName)}
+            </span>
+            <div className="admin-orders-view__customer-meta">
+              <strong>{order.customerName}</strong>
+              <span>{order.email}</span>
+            </div>
           </div>
-          <strong className="admin-orders-view__total">{formatPrice(order.amount)}</strong>
+          <div className="admin-orders-view__amount-box">
+            <span className="admin-orders-view__amount-label">Order Total</span>
+            <strong className="admin-orders-view__total">{formatPrice(order.amount)}</strong>
+          </div>
         </div>
+
         <div className="admin-orders-view__badges">
           <StatusBadge status={order.paymentStatus} kind="pay" />
           <StatusBadge status={order.status} />
         </div>
-        <dl className="admin-orders-view__dl">
-          <div>
-            <dt>Items</dt>
-            <dd>
-              {count} {count === 1 ? 'item' : 'items'}
-            </dd>
+
+        <div className="admin-orders-view__meta-card">
+          <dl className="admin-orders-view__dl">
+            <div>
+              <dt>Items</dt>
+              <dd>
+                {count} {count === 1 ? 'item' : 'items'}
+              </dd>
+            </div>
+            <div>
+              <dt>Payment</dt>
+              <dd>{order.payment}</dd>
+            </div>
+            <div>
+              <dt>Expected Delivery</dt>
+              <dd>{formatExpectedDate(order.expectedDeliveryDate)}</dd>
+            </div>
+            <div>
+              <dt>Ship to</dt>
+              <dd>{order.address?.city || '—'}</dd>
+            </div>
+            <div>
+              <dt>Phone</dt>
+              <dd>{order.phone || '—'}</dd>
+            </div>
+          </dl>
+        </div>
+
+        <div className="admin-orders-view__items-wrap">
+          <div className="admin-orders-view__items-head">
+            <span>Ordered Items ({count})</span>
           </div>
-          <div>
-            <dt>Payment</dt>
-            <dd>{order.payment}</dd>
-          </div>
-          <div>
-            <dt>Phone</dt>
-            <dd>{order.phone || '—'}</dd>
-          </div>
-          <div>
-            <dt>Ship to</dt>
-            <dd>{order.address?.city || '—'}</dd>
-          </div>
-        </dl>
-        <ul className="admin-orders-view__items">
-          {order.items?.map((item) => (
-            <li key={`${item.id}-${item.weight}`}>
-              <span>
-                {item.name}
-                <em>
-                  {item.quantity} × {item.weight}
-                  {item.storefront ? ` · ${storefrontLabel(item.storefront)}` : ''}
-                </em>
-              </span>
-              <strong>{formatPrice(item.price * item.quantity)}</strong>
-            </li>
-          ))}
-        </ul>
+          <ul className="admin-orders-view__items">
+            {order.items?.map((item) => (
+              <li key={`${item.id}-${item.weight}`}>
+                <div className="admin-orders-view__item-info">
+                  <span className="admin-orders-view__item-name">{item.name}</span>
+                  <em className="admin-orders-view__item-sub">
+                    {item.quantity} × {item.weight}
+                    {item.storefront ? ` · ${storefrontLabel(item.storefront)}` : ''}
+                  </em>
+                </div>
+                <strong className="admin-orders-view__item-price">{formatPrice(item.price * item.quantity)}</strong>
+              </li>
+            ))}
+          </ul>
+        </div>
       </div>
       <footer className="admin-orders-dialog__actions">
         <button type="button" className="admin-orders-dialog__ghost" onClick={onEdit}>
+          <Icon name="edit" size={14} />
           Update status
         </button>
         <button type="button" className="admin-orders-dialog__submit" onClick={onOpen}>
           Open order
+          <span aria-hidden="true" style={{ marginLeft: 6 }}>→</span>
         </button>
       </footer>
     </OrderDialog>
@@ -215,47 +256,99 @@ function OrderView({ order, onClose, onEdit, onOpen }) {
 function StatusForm({ order, onClose, onSave }) {
   const [status, setStatus] = useState(order.status)
   const [paymentStatus, setPaymentStatus] = useState(order.paymentStatus)
+  const initialDateStr = useMemo(() => {
+    if (!order.expectedDeliveryDate) return ''
+    const d = new Date(order.expectedDeliveryDate)
+    return !Number.isNaN(d.getTime()) ? d.toISOString().slice(0, 10) : ''
+  }, [order.expectedDeliveryDate])
+  const [expectedDate, setExpectedDate] = useState(initialDateStr)
   const [busy, setBusy] = useState(false)
-  const dirty = status !== order.status || paymentStatus !== order.paymentStatus
+  const dirty =
+    status !== order.status ||
+    paymentStatus !== order.paymentStatus ||
+    expectedDate !== initialDateStr
 
   async function submit(event) {
     event.preventDefault()
     if (!dirty || busy) return
     setBusy(true)
-    const ok = await onSave({ status, paymentStatus })
+    const payload = { status, paymentStatus }
+    if (expectedDate && expectedDate !== initialDateStr) {
+      payload.expectedDeliveryDate = new Date(`${expectedDate}T12:00:00.000Z`).toISOString()
+    }
+    const ok = await onSave(payload)
     setBusy(false)
     if (ok) onClose()
   }
 
   return (
-    <OrderDialog eyebrow="Fulfillment" title={order.number} copy="Update payment or order status." onClose={onClose}>
+    <OrderDialog eyebrow="Fulfillment" title={order.number} copy="Update payment, status, or expected delivery." onClose={onClose}>
       <form className="admin-orders-form" onSubmit={submit}>
-        <label className="admin-orders-form__field">
-          <span>Order status</span>
-          <select value={status} onChange={(event) => setStatus(event.target.value)}>
-            {ORDER_STATUSES.map((item) => (
-              <option key={item} value={item}>
-                {item}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="admin-orders-form__field">
-          <span>Payment status</span>
-          <select value={paymentStatus} onChange={(event) => setPaymentStatus(event.target.value)}>
-            {PAYMENT_STATUSES.map((item) => (
-              <option key={item} value={item}>
-                {item}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="admin-orders-form__summary">
+          <div className="admin-orders-form__summary-customer">
+            <span className="admin-orders__avatar" aria-hidden="true">
+              {initials(order.customerName)}
+            </span>
+            <div className="admin-orders-form__summary-meta">
+              <strong>{order.customerName}</strong>
+              <span>{order.email}</span>
+            </div>
+          </div>
+          <div className="admin-orders-view__amount-box">
+            <span className="admin-orders-view__amount-label">Order Total</span>
+            <strong className="admin-orders-view__total">{formatPrice(order.amount)}</strong>
+          </div>
+        </div>
+
+        <div className="admin-orders-form__card">
+          <label className="admin-orders-form__field">
+            <div className="admin-orders-form__label-row">
+              <span>Order status</span>
+              <span className="admin-orders-form__current">Current: {order.status}</span>
+            </div>
+            <select value={status} onChange={(event) => setStatus(event.target.value)}>
+              {ORDER_STATUSES.map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="admin-orders-form__field">
+            <div className="admin-orders-form__label-row">
+              <span>Payment status</span>
+              <span className="admin-orders-form__current">Current: {order.paymentStatus}</span>
+            </div>
+            <select value={paymentStatus} onChange={(event) => setPaymentStatus(event.target.value)}>
+              {PAYMENT_STATUSES.map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="admin-orders-form__field">
+            <div className="admin-orders-form__label-row">
+              <span>Expected delivery</span>
+              <span className="admin-orders-form__current">
+                Current: {formatExpectedDate(order.expectedDeliveryDate)}
+              </span>
+            </div>
+            <input
+              type="date"
+              className="admin-orders-form__input"
+              value={expectedDate}
+              onChange={(event) => setExpectedDate(event.target.value)}
+            />
+          </label>
+        </div>
+
         <footer className="admin-orders-dialog__actions">
           <button type="button" className="admin-orders-dialog__ghost" onClick={onClose}>
             Cancel
           </button>
           <button type="submit" className="admin-orders-dialog__submit" disabled={!dirty || busy}>
-            {busy ? 'Saving…' : 'Save'}
+            {busy ? 'Saving…' : 'Save Changes'}
           </button>
         </footer>
       </form>

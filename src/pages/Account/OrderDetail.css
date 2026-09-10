@@ -135,6 +135,92 @@
   background: currentColor;
 }
 
+/* ─── Expected Delivery Banner ─── */
+.od-delivery {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px 24px;
+  padding: 18px 24px;
+  background: linear-gradient(135deg, rgba(86, 112, 29, 0.06), rgba(46, 59, 38, 0.02));
+  border: 1px solid rgba(86, 112, 29, 0.18);
+  border-radius: 16px;
+  box-shadow: 0 4px 20px -4px rgba(46, 59, 38, 0.04);
+}
+
+.od-delivery__badge {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.od-delivery__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: var(--dark-green, #263320);
+  color: #fff;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px -2px rgba(38, 51, 32, 0.25);
+}
+
+.od-delivery__details {
+  display: grid;
+  gap: 2px;
+}
+
+.od-delivery__label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--terracotta, #b85d38);
+}
+
+.od-delivery__date {
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--espresso-brown, #222);
+  letter-spacing: -0.01em;
+}
+
+.od-delivery__stage {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  background: #ffffff;
+  border: 1px solid rgba(86, 112, 29, 0.18);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  box-shadow: 0 2px 8px -2px rgba(46, 59, 38, 0.05);
+}
+
+.od-delivery__stage-label {
+  color: rgba(var(--charcoal-rgb), 0.6);
+}
+
+.od-delivery__stage-val {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--espresso-brown, #222);
+  font-weight: 700;
+}
+
+.od-delivery__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--sv-green, #56701d);
+  box-shadow: 0 0 0 3px rgba(86, 112, 29, 0.2);
+}
+
 .od-note {
   max-width: 42ch;
   margin: 12px 0 0;

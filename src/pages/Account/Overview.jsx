@@ -14,6 +14,7 @@ function mapStatus(raw) {
     CONFIRMED: 'Confirmed',
     PROCESSING: 'Processing',
     SHIPPED: 'Shipped',
+    OUT_FOR_DELIVERY: 'Out for Delivery',
     DELIVERED: 'Delivered',
     CANCELLED: 'Cancelled',
   }
@@ -24,6 +25,7 @@ function mapPaymentStatus(raw) {
   const map = {
     PENDING: 'Pending',
     PAID: 'Paid',
+    SUCCESS: 'Paid',
     FAILED: 'Failed',
     REFUNDED: 'Refunded',
   }
