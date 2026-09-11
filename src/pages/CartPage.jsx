@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useCart } from '../context/CartContext.jsx'
+import { useAuth } from '../context/AuthContext.jsx'
 import { getCategoryBySlug } from '../data/categories.js'
 import { productHref } from '../data/products.js'
 import { getFeaturedProducts } from '../api/products.js'
 import { getStorefront } from '../data/storefronts.js'
 import { formatPrice } from '../utils/money.js'
 import CartRemoveModal from '../components/cart/CartRemoveModal.jsx'
+import CartLoginModal from '../components/cart/CartLoginModal.jsx'
 import './CartPage.css'
 
 const MAX_QTY = 12
@@ -244,13 +246,34 @@ function RelatedCard({ product, onAdd }) {
 
 function CartPage() {
   const { items, count, addItem, setItemQuantity } = useCart()
+  const { user } = useAuth()
+  const navigate = useNavigate()
   const [promo, setPromo] = useState('')
   const [itemPendingRemoval, setItemPendingRemoval] = useState(null)
+  const [showLoginModal, setShowLoginModal] = useState(false)
   const subtotal = useMemo(
     () => items.reduce((sum, item) => sum + item.price * item.quantity, 0),
     [items],
   )
   const [featuredList, setFeaturedList] = useState([])
+
+  function handleProceedToCheckout() {
+    if (!user) {
+      setShowLoginModal(true)
+      return
+    }
+    navigate('/checkout')
+  }
+
+  function handleConfirmLogin() {
+    setShowLoginModal(false)
+    navigate('/login', {
+      state: {
+        from: '/checkout',
+        message: 'Please log in to continue with your order.',
+      },
+    })
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -350,9 +373,13 @@ function CartPage() {
                   <strong>{formatPrice(subtotal)}</strong>
                 </div>
 
-                <Link to="/checkout" className="cart-btn cart-btn--solid">
+                <button
+                  type="button"
+                  onClick={handleProceedToCheckout}
+                  className="cart-btn cart-btn--solid"
+                >
                   Proceed to Checkout
-                </Link>
+                </button>
                 <Link to="/shop" className="cart-btn cart-btn--ghost">
                   Continue Shopping
                 </Link>
@@ -402,6 +429,13 @@ function CartPage() {
             setItemQuantity(target, 0)
           }}
           onCancel={() => setItemPendingRemoval(null)}
+        />
+      ) : null}
+
+      {showLoginModal ? (
+        <CartLoginModal
+          onConfirm={handleConfirmLogin}
+          onCancel={() => setShowLoginModal(false)}
         />
       ) : null}
     </section>

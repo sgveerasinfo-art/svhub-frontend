@@ -2093,3 +2093,66 @@ html.admin-open #root {
     justify-content: flex-end;
   }
 }
+
+@media (max-width: 480px) {
+  .admin-topbar {
+    padding: 0 10px;
+    gap: 8px;
+  }
+
+  .admin-topbar__title {
+    font-size: 14px;
+    max-width: 120px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .admin-content {
+    padding: 16px 10px 32px;
+  }
+
+  .admin-title {
+    font-size: 24px !important;
+  }
+
+  .admin-modal-root {
+    padding: 12px;
+  }
+
+  .admin-modal {
+    padding: 16px 14px;
+    border-radius: 12px;
+  }
+
+  .admin-modal__actions {
+    flex-direction: column-reverse;
+    gap: 8px;
+  }
+
+  .admin-modal__actions button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .admin-table-wrap {
+    margin: 0 -10px;
+    border-radius: 0;
+    border-left: 0;
+    border-right: 0;
+  }
+
+  .admin-metricstrip,
+  .admin-kpis {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-metric {
+    border-right: 0 !important;
+    border-top: 1px solid var(--admin-line) !important;
+  }
+
+  .admin-metric:first-child {
+    border-top: 0 !important;
+  }
+}

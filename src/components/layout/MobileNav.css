@@ -132,6 +132,7 @@
 .mobile-nav.is-open .mobile-nav__link:nth-child(4) { transition-delay: 210ms; }
 .mobile-nav.is-open .mobile-nav__link:nth-child(5) { transition-delay: 250ms; }
 .mobile-nav.is-open .mobile-nav__link:nth-child(6) { transition-delay: 290ms; }
+.mobile-nav.is-open .mobile-nav__link:nth-child(7) { transition-delay: 330ms; }
 
 .mobile-nav__index {
   flex-shrink: 0;

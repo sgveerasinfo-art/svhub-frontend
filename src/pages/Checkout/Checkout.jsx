@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { useCart } from '../../context/CartContext.jsx'
 import { useAuth } from '../../context/AuthContext.jsx'
+import { readToken } from '../../api/auth.js'
 import { createOrder } from '../../api/orders.js'
 import { createRazorpayOrder, verifyRazorpayPayment, recordPaymentFailure } from '../../api/payments.js'
 import { getAddresses, createAddress, updateAddress, deleteAddress } from '../../api/addresses.js'
@@ -159,7 +160,16 @@ function Checkout() {
 
   useEffect(() => {
     window.scrollTo(0, 0)
-  }, [])
+    if (!user && !readToken()) {
+      navigate('/login', {
+        replace: true,
+        state: {
+          from: '/checkout',
+          message: 'Please log in to continue with your order.',
+        },
+      })
+    }
+  }, [user, navigate])
 
   // Prefill user details
   useEffect(() => {

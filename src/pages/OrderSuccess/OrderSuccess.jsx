@@ -177,6 +177,7 @@ function OrderSuccess() {
       city: liveOrder.shippingAddress?.city ? `${liveOrder.shippingAddress.city}, ${liveOrder.shippingAddress.state}` : SAMPLE.city,
       addressLines: liveOrder.shippingAddress?.lines || SAMPLE.addressLines,
       payment: `Paid via Razorpay (${liveOrder.paymentStatus})`,
+      items: liveOrder.items || [],
     } : {}),
   }
 
@@ -268,6 +269,30 @@ function OrderSuccess() {
                 ))}
               </p>
             </div>
+
+            {order.items && order.items.length > 0 ? (
+              <div className="success__items">
+                <h2>Items Ordered ({order.items.length})</h2>
+                <ul className="success__items-list">
+                  {order.items.map((item, idx) => (
+                    <li key={idx} className="success__item-line">
+                      {item.image ? (
+                        <img src={item.image} alt="" className="success__item-img" />
+                      ) : null}
+                      <div className="success__item-info">
+                        <span className="success__item-name">{item.productName || item.name}</span>
+                        <span className="success__item-meta">
+                          {[item.variantLabel || item.weight, `Qty: ${item.quantity}`].filter(Boolean).join(' • ')}
+                        </span>
+                      </div>
+                      <span className="success__item-price">
+                        {formatMoney((item.unitPrice || item.price || 0) * (item.quantity || 1))}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
           </div>
 
           <div className="success__banner">

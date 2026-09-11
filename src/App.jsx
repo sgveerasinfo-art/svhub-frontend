@@ -3,6 +3,7 @@ import { AuthProvider } from './context/AuthContext.jsx'
 import { CartProvider } from './context/CartContext.jsx'
 import AdminLayout from './components/admin/AdminLayout.jsx'
 import RequireAdmin from './components/admin/RequireAdmin.jsx'
+import RequireCustomerAuth from './components/auth/RequireCustomerAuth.jsx'
 import Layout from './components/layout/Layout.jsx'
 import AdminDashboard from './pages/Admin/Dashboard.jsx'
 import AdminOrders from './pages/Admin/Orders.jsx'
@@ -78,7 +79,9 @@ function App() {
               <Route element={<Layout />}>
                 <Route path="/" element={<Home />} />
                 <Route path="/cart" element={<CartPage />} />
-                <Route path="/checkout" element={<Checkout />} />
+                <Route element={<RequireCustomerAuth />}>
+                  <Route path="/checkout" element={<Checkout />} />
+                </Route>
                 <Route path="/order-success" element={<OrderSuccess />} />
                 <Route path="/payment-failed" element={<PaymentFailed />} />
                 <Route path="/shop" element={<Shop />} />

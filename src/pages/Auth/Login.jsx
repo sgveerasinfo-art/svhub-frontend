@@ -21,7 +21,9 @@ function Login() {
   const { user, login, loginWithGoogle, logout } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
-  const from = safeFrom(location.state?.from)
+  const redirectParam = new URLSearchParams(location.search).get('redirect')
+  const from = safeFrom(location.state?.from || redirectParam)
+  const infoMessage = location.state?.message || ''
   const justRegistered = Boolean(location.state?.registered)
 
   const [identifier, setIdentifier] = useState(location.state?.email || '')
@@ -118,6 +120,11 @@ function Login() {
             {justRegistered ? (
               <AuthAlert tone="success">
                 Registration successful. Please log in to continue.
+              </AuthAlert>
+            ) : null}
+            {infoMessage ? (
+              <AuthAlert tone="info">
+                {infoMessage}
               </AuthAlert>
             ) : null}
             <AuthAlert>{formError}</AuthAlert>

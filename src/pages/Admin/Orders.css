@@ -1117,3 +1117,37 @@
     gap: 10px;
   }
 }
+
+@media (max-width: 480px) {
+  .admin-orders__head {
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+
+  .admin-orders__stat {
+    padding: 10px 8px;
+  }
+
+  .admin-orders__stat strong {
+    font-size: 18px;
+  }
+
+  .admin-orders__stat span {
+    font-size: 11px;
+  }
+
+  .admin-orders-dialog__panel {
+    padding: 16px 14px 0;
+  }
+
+  .admin-orders-dialog__actions {
+    margin: 12px -14px 0;
+    padding: 12px 14px 16px;
+    flex-direction: column-reverse;
+    gap: 8px;
+  }
+
+  .admin-orders-dialog__actions button {
+    width: 100%;
+  }
+}

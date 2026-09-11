@@ -152,8 +152,14 @@
 
 .co-fields {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 16px;
+}
+
+@media (min-width: 640px) {
+  .co-fields {
+    grid-template-columns: 1fr 1fr;
+  }
 }
 
 .co-field {
@@ -401,8 +407,14 @@
 
 .co-card-row {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 16px;
+}
+
+@media (min-width: 640px) {
+  .co-card-row {
+    grid-template-columns: 1fr 1fr;
+  }
 }
 
 .co-summary {
@@ -2294,6 +2306,60 @@
 @media (min-width: 1024px) {
   .co-map-canvas-container {
     height: 400px;
+  }
+}
+
+/* Compact mobile viewports: 320px - 480px */
+@media (max-width: 480px) {
+  .co-main {
+    padding: 20px 12px 100px;
+  }
+
+  .co-card {
+    padding: 16px 14px;
+    border-radius: 10px;
+  }
+
+  .co-summary {
+    padding: 16px 14px;
+    border-radius: 10px;
+  }
+
+  .co-intro h1 {
+    font-size: 24px;
+    line-height: 30px;
+  }
+
+  .co-step {
+    gap: 12px;
+    margin-bottom: 18px;
+  }
+
+  .co-step h2 {
+    font-size: 19px;
+    line-height: 25px;
+  }
+
+  .co-dock {
+    padding: 12px 12px max(12px, var(--safe-bottom));
+  }
+
+  .co-pay {
+    min-height: 50px;
+    padding: 12px 18px;
+    font-size: 13px;
+  }
+
+  .co-addr-card {
+    padding: 14px;
+  }
+
+  .co-ship__opt {
+    padding: 14px;
+  }
+
+  .co-method {
+    padding: 14px;
   }
 }
 

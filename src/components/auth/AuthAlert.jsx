@@ -1,10 +1,17 @@
 function AuthAlert({ children, tone = 'error' }) {
   if (!children) return null
 
+  const modifier =
+    tone === 'success'
+      ? ' auth-alert--success'
+      : tone === 'info'
+        ? ' auth-alert--info'
+        : ''
+
   return (
     <p
-      className={`auth-alert${tone === 'success' ? ' auth-alert--success' : ''}`}
-      role={tone === 'success' ? 'status' : 'alert'}
+      className={`auth-alert${modifier}`}
+      role={tone === 'error' ? 'alert' : 'status'}
     >
       {children}
     </p>

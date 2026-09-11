@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { NavLink, Link } from 'react-router-dom'
+import { useAuth } from '../../context/AuthContext.jsx'
 import Logo from '../brand/Logo.jsx'
 import './MobileNav.css'
 
@@ -11,9 +12,18 @@ function CloseIcon() {
   )
 }
 
-function MobileNav({ open, onClose, links, cartCount }) {
+function MobileNav({ open, onClose, links }) {
+  const { user } = useAuth()
   const closeRef = useRef(null)
   const panelRef = useRef(null)
+
+  const navLinks = [
+    ...links,
+    {
+      to: '/account',
+      label: user ? 'Account' : 'Account / Login',
+    },
+  ]
 
   useEffect(() => {
     if (!open) return undefined
@@ -67,7 +77,7 @@ function MobileNav({ open, onClose, links, cartCount }) {
         <p className="mobile-nav__eyebrow">Explore SV Hub</p>
 
         <nav className="mobile-nav__links" aria-label="Mobile">
-          {links.map((link, index) => (
+          {navLinks.map((link, index) => (
             <NavLink
               key={link.to}
               to={link.to}
@@ -82,18 +92,6 @@ function MobileNav({ open, onClose, links, cartCount }) {
             </NavLink>
           ))}
         </nav>
-
-        <div className="mobile-nav__footer">
-          <Link to="/search" className="mobile-nav__action" onClick={onClose}>
-            Search
-          </Link>
-          <Link to="/account" className="mobile-nav__action" onClick={onClose}>
-            Account
-          </Link>
-          <Link to="/cart" className="mobile-nav__action" onClick={onClose}>
-            Cart{cartCount > 0 ? <span className="mobile-nav__count">{cartCount}</span> : null}
-          </Link>
-        </div>
       </aside>
     </div>
   )
