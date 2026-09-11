@@ -13,6 +13,7 @@ import { getStorefront } from '../../data/storefronts.js'
 import ShopFilters from '../Shop/ShopFilters.jsx'
 import ShopProduct from '../Shop/ShopProduct.jsx'
 import ShopSheet from '../Shop/ShopSheet.jsx'
+import { products as staticCatalog } from '../../data/products.js'
 import '../Shop/Shop.css'
 import './Category.css'
 
@@ -129,12 +130,31 @@ function Category() {
     })
       .then((res) => {
         if (id !== fetchRef.current) return
-        setProducts(res.data || [])
-        setPagination(res.pagination || { total: 0, totalPages: 1, page: filters.page || 1 })
+        if (res?.data?.length) {
+          setProducts(res.data)
+          setPagination(res.pagination || { total: res.data.length, totalPages: 1, page: filters.page || 1 })
+        } else {
+          // Fallback if backend returned empty for this category
+          const matchingStatic = staticCatalog.filter((p) => p.category === category.slug)
+          if (matchingStatic.length) {
+            setProducts(matchingStatic)
+            setPagination({ total: matchingStatic.length, totalPages: 1, page: 1 })
+          } else {
+            setProducts([])
+            setPagination({ total: 0, totalPages: 1, page: 1 })
+          }
+        }
       })
       .catch(() => {
         if (id !== fetchRef.current) return
-        setProducts([])
+        const matchingStatic = staticCatalog.filter((p) => p.category === category?.slug)
+        if (matchingStatic.length) {
+          setProducts(matchingStatic)
+          setPagination({ total: matchingStatic.length, totalPages: 1, page: 1 })
+        } else {
+          setProducts([])
+          setPagination({ total: 0, totalPages: 1, page: 1 })
+        }
       })
       .finally(() => {
         if (id === fetchRef.current) setLoading(false)

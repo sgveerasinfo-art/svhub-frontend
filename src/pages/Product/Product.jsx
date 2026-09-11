@@ -7,7 +7,7 @@ import { useCart } from '../../context/CartContext.jsx'
 import { getProduct, getRelatedProducts } from '../../api/products.js'
 import { getCategoryBySlug } from '../../data/categories.js'
 import { getStorefront } from '../../data/storefronts.js'
-import { defaultShipping, readViewed, rememberViewed } from '../../data/productDetails.js'
+import { defaultShipping, readViewed, rememberViewed, getProductDetail, relatedFor } from '../../data/productDetails.js'
 import ShopProduct from '../Shop/ShopProduct.jsx'
 import { formatPrice } from '../../utils/money.js'
 import './Product.css'
@@ -152,26 +152,51 @@ function ProductRail({ id, eyebrow, title, products }) {
   )
 }
 
-// Enrich a backend product with UI metadata from static lookups
+// Enrich a backend or static product with UI metadata from lookups
 function enrichProduct(apiProduct) {
+  if (!apiProduct) return null
   const storefrontData = getStorefront(apiProduct.storefront)
   const categoryData = getCategoryBySlug(apiProduct.category)
 
   // Normalize variants: backend uses variantId, UI uses id
-  const variants = (apiProduct.variants || []).map((v) => ({
+  const rawVariants = Array.isArray(apiProduct.variants) && apiProduct.variants.length
+    ? apiProduct.variants
+    : [
+        {
+          id: 'standard',
+          variantId: 'standard',
+          label: apiProduct.weight || 'Standard',
+          weight: apiProduct.weight || '500g',
+          price: apiProduct.price || 0,
+          stock: apiProduct.stock || 'in-stock',
+        },
+      ]
+
+  const variants = rawVariants.map((v) => ({
     ...v,
-    id: v.variantId, // UI compatibility
+    id: v.variantId || v.id || 'standard',
+    variantId: v.variantId || v.id || 'standard',
     stock: v.stock || (v.qty > 0 ? (v.qty <= 10 ? 'low-stock' : 'in-stock') : 'out-of-stock'),
   }))
 
-  // Derive gallery: backend returns array of strings, UI expects { src, alt }[]
-  const gallery = (apiProduct.gallery || [apiProduct.image]).filter(Boolean).map((src, i) => ({
-    src,
-    alt: i === 0 ? apiProduct.name : `${apiProduct.name} — view ${i + 1}`,
-  }))
+  // Derive gallery: support array of strings or { src, alt } objects
+  const rawGallery = Array.isArray(apiProduct.gallery) && apiProduct.gallery.length
+    ? apiProduct.gallery
+    : (apiProduct.image ? [apiProduct.image] : [])
+  const gallery = rawGallery.filter(Boolean).map((item, i) => {
+    if (typeof item === 'object' && item !== null && item.src) {
+      return item
+    }
+    return {
+      src: typeof item === 'string' ? item : (item.src || apiProduct.image),
+      alt: i === 0 ? apiProduct.name : `${apiProduct.name} — view ${i + 1}`,
+    }
+  })
 
   return {
     ...apiProduct,
+    id: apiProduct.id || apiProduct._id || apiProduct.slug,
+    slug: apiProduct.slug || apiProduct.id,
     variants,
     gallery,
     // Reconstruct static metadata the UI expects
@@ -187,8 +212,8 @@ function enrichProduct(apiProduct) {
       ? { name: categoryData.name, to: categoryData.to }
       : { name: apiProduct.category, to: '/shop' },
     // information = specifications (same field, different name in old static data)
-    information: apiProduct.specifications || [],
-    shipping: defaultShipping,
+    information: apiProduct.specifications || apiProduct.information || [],
+    shipping: apiProduct.shipping || defaultShipping,
     // stock from base product
     stock: apiProduct.stock || (apiProduct.qty > 0 ? (apiProduct.qty <= 10 ? 'low-stock' : 'in-stock') : 'out-of-stock'),
   }
@@ -210,6 +235,7 @@ function Product() {
 
     getProduct(slug)
       .then((res) => {
+        if (!res?.data) throw new Error('Product not found in API')
         const enriched = enrichProduct(res.data)
         setProduct(enriched)
         document.title = `${enriched.name} · SV Hub`
@@ -225,15 +251,30 @@ function Product() {
         return getRelatedProducts(slug, 4)
       })
       .then((res) => {
-        setRelated((res?.data || []).map(enrichProduct))
-      })
-      .catch((err) => {
-        if (err.status === 404) {
-          setNotFound(true)
+        if (res?.data?.length) {
+          setRelated((res.data || []).map(enrichProduct))
         } else {
-          setNotFound(true) // treat errors as not found for simplicity
+          // Fallback related products from local catalog
+          const localFallback = getProductDetail(slug)
+          if (localFallback) {
+            setRelated((relatedFor(localFallback, 4) || []).map(enrichProduct))
+          }
         }
-        document.title = PAGE_TITLE
+      })
+      .catch(() => {
+        // Fallback to static catalog if backend doesn't have it or returned 404
+        const staticProd = getProductDetail(slug)
+        if (staticProd) {
+          const enriched = enrichProduct(staticProd)
+          setProduct(enriched)
+          document.title = `${enriched.name} · SV Hub`
+          const staticRelated = (relatedFor(staticProd, 4) || []).map(enrichProduct)
+          setRelated(staticRelated)
+          setNotFound(false)
+        } else {
+          setNotFound(true)
+          document.title = PAGE_TITLE
+        }
       })
       .finally(() => setLoading(false))
 

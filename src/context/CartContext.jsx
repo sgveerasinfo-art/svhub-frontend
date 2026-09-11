@@ -205,7 +205,20 @@ export function CartProvider({ children }) {
       const res = await cartApi.addToCart({ productId, variantId, quantity: qty })
       applyServerCart(res)
     } catch (err) {
-      console.error('addItem failed:', err.message)
+      console.warn('Backend cart add failed, falling back to local item:', err.message)
+      setItems((current) => {
+        const key = lineKey(product)
+        const existing = current.find((item) => lineKey(item) === key)
+        let updated
+        if (existing) {
+          updated = current.map((item) =>
+            lineKey(item) === key ? { ...item, quantity: item.quantity + qty } : item,
+          )
+        } else {
+          updated = [...current, { ...product, quantity: qty }]
+        }
+        return updated
+      })
     }
   }, [isLoggedIn])
 
