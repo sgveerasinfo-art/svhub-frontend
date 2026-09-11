@@ -113,6 +113,7 @@ export function normalizeOrderForAdmin(order) {
     expectedDeliveryDate: order.expectedDeliveryDate || null,
     courier: order.courier || null,
     trackingNumber: order.trackingNumber || null,
+    trackingUrl: order.trackingUrl || null,
     notes: order.notes || '',
     date: order.createdAt || order.date || new Date().toISOString(),
     createdAt: order.createdAt || order.date,

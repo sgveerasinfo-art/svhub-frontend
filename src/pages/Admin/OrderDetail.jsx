@@ -94,9 +94,18 @@ function OrderDetailContent({ order, onOrderUpdated, toast }) {
 
   // Critical status confirmation modal state
   const [criticalModal, setCriticalModal] = useState(null)
-  const [courierInput, setCourierInput] = useState(order.courier || 'BlueDart Express')
-  const [trackingInput, setTrackingInput] = useState(order.trackingNumber || `BLU-${cleanSlug(order.number).toUpperCase()}`)
+  const [courierInput, setCourierInput] = useState(order.courier || '')
+  const [trackingUrlInput, setTrackingUrlInput] = useState(order.trackingUrl || '')
+  const [shippedFormError, setShippedFormError] = useState('')
   const [cancelReasonInput, setCancelReasonInput] = useState('')
+
+  // Sync tracking input states whenever order prop updates
+  useEffect(() => {
+    setCourierInput(order.courier || '')
+    setTrackingUrlInput(order.trackingUrl || '')
+    setCurrentStatus(order.status)
+    setCurrentPaymentStatus(order.paymentStatus)
+  }, [order.courier, order.trackingUrl, order.status, order.paymentStatus])
 
   const headerTitle = useMemo(() => {
     if (!order.number) return 'Order #SVH12345'
@@ -118,7 +127,12 @@ function OrderDetailContent({ order, onOrderUpdated, toast }) {
 
   // Handle status changes with confirmation for critical statuses
   function handleStatusSelect(newStatus) {
-    if (newStatus === currentStatus) return
+    if (newStatus === currentStatus) {
+      if (newStatus === 'Shipped') {
+        setCriticalModal({ targetStatus: 'Shipped', isEditing: true })
+      }
+      return
+    }
 
     // Critical statuses require confirmation
     if (['Shipped', 'Delivered', 'Cancelled'].includes(newStatus)) {
@@ -159,10 +173,42 @@ function OrderDetailContent({ order, onOrderUpdated, toast }) {
     const { targetStatus } = criticalModal
 
     if (targetStatus === 'Shipped') {
+      // Frontend validation before submitting
+      const providerTrimmed = courierInput.trim()
+      let urlTrimmed = trackingUrlInput.trim()
+      if (!providerTrimmed) {
+        setShippedFormError('Delivery Provider is required.')
+        return
+      }
+      if (!urlTrimmed) {
+        setShippedFormError('Tracking URL is required.')
+        return
+      }
+
+      // Auto-prefix protocol if missing (e.g. www.delhivery.com/track/123)
+      if (!/^https?:\/\//i.test(urlTrimmed)) {
+        if (/^[a-z0-9+-.]+:/i.test(urlTrimmed)) {
+          setShippedFormError('Only http:// and https:// URLs are allowed.')
+          return
+        }
+        urlTrimmed = `https://${urlTrimmed}`
+      }
+
+      try {
+        const parsed = new URL(urlTrimmed)
+        if (!['http:', 'https:'].includes(parsed.protocol)) {
+          setShippedFormError('Tracking URL must start with http:// or https://')
+          return
+        }
+      } catch {
+        setShippedFormError('Please enter a valid tracking URL (e.g. https://provider.com/track/ABC123)')
+        return
+      }
+      setShippedFormError('')
       applyStatusUpdate('Shipped', {
-        courier: courierInput || 'BlueDart Express',
-        trackingNumber: trackingInput || `BLU-${cleanSlug(order.number).toUpperCase()}`,
-        note: `Dispatched via ${courierInput || 'BlueDart Express'} (AWB: ${trackingInput || 'BLU-EXPRESS'})`,
+        courier: providerTrimmed,
+        trackingUrl: urlTrimmed,
+        note: `Dispatched via ${providerTrimmed}`,
       })
     } else if (targetStatus === 'Delivered') {
       applyStatusUpdate('Delivered', {
@@ -563,13 +609,34 @@ function OrderDetailContent({ order, onOrderUpdated, toast }) {
                 </select>
               </div>
 
+              {['Shipped', 'Out for Delivery', 'Delivered'].includes(currentStatus) && (
+                <button
+                  type="button"
+                  onClick={() => setCriticalModal({ targetStatus: 'Shipped', isEditing: true })}
+                  style={{
+                    marginTop: 10,
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: 6,
+                    border: '1px solid var(--sv-green, #5a7a2e)',
+                    background: 'rgba(90,122,46,0.08)',
+                    color: 'var(--sv-green, #5a7a2e)',
+                    fontSize: 13,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Edit Shipment / Tracking Link
+                </button>
+              )}
+
               {currentStatus === 'Cancelled' ? (
                 <div className="admin-status-warning">
                   <Icon name="alert" size={16} />
                   <span>This order is cancelled. Fulfillment has been stopped.</span>
                 </div>
               ) : (
-                <p style={{ fontSize: 12, color: 'var(--admin-mute)', margin: 0 }}>
+                <p style={{ fontSize: 12, color: 'var(--admin-mute)', margin: '8px 0 0' }}>
                   Changing to critical statuses (Shipped, Delivered, or Cancelled) will prompt a confirmation modal.
                 </p>
               )}
@@ -682,8 +749,8 @@ function OrderDetailContent({ order, onOrderUpdated, toast }) {
               {/* Courier and tracking info */}
               <div className="admin-delivery-courier">
                 <div className="admin-courier-meta">
-                  <strong>{order.courier || 'BlueDart Express'}</strong>
-                  <span>Standard Fulfillment Logistics</span>
+                  <strong>{order.courier || '—'}</strong>
+                  <span>Delivery Partner</span>
                 </div>
                 {order.trackingNumber ? (
                   <div className="admin-tracking-code">
@@ -698,8 +765,44 @@ function OrderDetailContent({ order, onOrderUpdated, toast }) {
                       <Icon name="copy" size={12} />
                     </button>
                   </div>
+                ) : null}
+                {order.trackingUrl ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginTop: 4 }}>
+                    <a
+                      href={/^https?:\/\//i.test(order.trackingUrl) ? order.trackingUrl : `https://${order.trackingUrl}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="admin-textlink"
+                      style={{ fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                    >
+                      <Icon name="arrow" size={11} />
+                      Open tracking page
+                    </a>
+                    <button
+                      type="button"
+                      className="admin-textlink"
+                      style={{ fontSize: 12, cursor: 'pointer', background: 'none', border: 'none', padding: 0, textDecoration: 'underline' }}
+                      onClick={() => setCriticalModal({ targetStatus: 'Shipped', isEditing: true })}
+                    >
+                      Edit tracking link
+                    </button>
+                  </div>
                 ) : (
-                  <span style={{ fontSize: 11, color: 'var(--admin-mute)' }}>Pending dispatch</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+                    <span style={{ fontSize: 11, color: 'var(--admin-mute)' }}>
+                      {['Shipped', 'Out for Delivery', 'Delivered'].includes(order.status) ? 'No tracking URL set' : 'Pending dispatch'}
+                    </span>
+                    {['Shipped', 'Out for Delivery', 'Delivered'].includes(order.status) && (
+                      <button
+                        type="button"
+                        className="admin-textlink"
+                        style={{ fontSize: 12, cursor: 'pointer', background: 'none', border: 'none', padding: 0, textDecoration: 'underline' }}
+                        onClick={() => setCriticalModal({ targetStatus: 'Shipped', isEditing: true })}
+                      >
+                        Add tracking link
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
             </div>
@@ -787,29 +890,42 @@ function OrderDetailContent({ order, onOrderUpdated, toast }) {
                 <div className="admin-confirm-modal__alert admin-confirm-modal__alert--info">
                   <Icon name="truck" size={18} />
                   <span>
-                    Marking this order as <strong>Shipped</strong> will trigger an automated dispatch notification to{' '}
-                    <strong>{order.customerName}</strong> ({order.email}).
+                    Marking this order as <strong>Shipped</strong> will notify{' '}
+                    <strong>{order.customerName}</strong> ({order.email}) that their parcel is on its way.
                   </span>
                 </div>
+
+                {shippedFormError && (
+                  <p style={{ margin: 0, padding: '8px 12px', background: 'rgba(220,38,38,0.08)', borderRadius: 6, color: 'var(--terracotta)', fontSize: 13 }} role="alert">
+                    {shippedFormError}
+                  </p>
+                )}
+
                 <div className="admin-confirm-field">
-                  <label htmlFor="courier-name-input">Courier / Shipping Partner</label>
+                  <label htmlFor="courier-name-input">Delivery Provider <span style={{ color: 'var(--terracotta)' }}>*</span></label>
                   <input
                     id="courier-name-input"
                     type="text"
                     value={courierInput}
-                    onChange={(e) => setCourierInput(e.target.value)}
-                    placeholder="e.g. BlueDart Express, Delhivery"
+                    onChange={(e) => { setCourierInput(e.target.value); setShippedFormError('') }}
+                    placeholder="e.g. Delhivery, BlueDart, DTDC"
+                    required
                   />
                 </div>
+
                 <div className="admin-confirm-field">
-                  <label htmlFor="tracking-code-input">Tracking / AWB Number</label>
+                  <label htmlFor="tracking-url-input">Tracking URL <span style={{ color: 'var(--terracotta)' }}>*</span></label>
                   <input
-                    id="tracking-code-input"
-                    type="text"
-                    value={trackingInput}
-                    onChange={(e) => setTrackingInput(e.target.value)}
-                    placeholder="e.g. BLU-98214-IN"
+                    id="tracking-url-input"
+                    type="url"
+                    value={trackingUrlInput}
+                    onChange={(e) => { setTrackingUrlInput(e.target.value); setShippedFormError('') }}
+                    placeholder="https://www.delhivery.com/track/package/XXXXXXXX"
+                    required
                   />
+                  <span style={{ fontSize: '11px', color: 'var(--admin-mute)', marginTop: '4px', display: 'block' }}>
+                    Paste the exact tracking page URL provided by the delivery partner. The customer will be redirected here.
+                  </span>
                 </div>
               </div>
             )}

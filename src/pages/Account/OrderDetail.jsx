@@ -113,6 +113,9 @@ function OrderDetail() {
   const [cancelError, setCancelError] = useState('')
   const [cancelSuccessMsg, setCancelSuccessMsg] = useState('')
 
+  // Shipment tracking
+  const [shipmentOpen, setShipmentOpen] = useState(false)
+
   const fetchOrderDetail = () => {
     if (!user || !orderId) return
     setLoading(true)
@@ -149,6 +152,8 @@ function OrderDetail() {
           shippingFee: raw.shippingFee,
           discount: raw.discount,
           address: raw.shippingAddress,
+          courier: raw.courier || null,
+          trackingUrl: raw.trackingUrl || null,
           items: (raw.items || []).map((item) => ({
             id: item.productId,
             name: item.productName,
@@ -170,6 +175,14 @@ function OrderDetail() {
 
   useEffect(() => {
     fetchOrderDetail()
+
+    const handleFocus = () => {
+      fetchOrderDetail()
+    }
+    window.addEventListener('focus', handleFocus)
+    return () => {
+      window.removeEventListener('focus', handleFocus)
+    }
   }, [user, orderId])
 
   const handleCancelSubmit = async (e) => {
@@ -332,6 +345,46 @@ function OrderDetail() {
       ) : null}
 
       <OrderTimeline status={order.status} cancellationReason={order.cancellationReason} />
+
+      {/* ── Shipment Details Section ─────────────────────────────────────── */}
+      {['SHIPPED', 'OUT_FOR_DELIVERY', 'DELIVERED'].includes(order.rawStatus) ? (
+        <section className="od-shipment" aria-labelledby="od-shipment-heading">
+          <div className="od-shipment__head">
+            <div>
+              <h2 id="od-shipment-heading" className="od-kicker">Shipment Details</h2>
+              {order.courier ? (
+                <p className="od-shipment__provider">
+                  <span className="od-shipment__provider-label">Delivery Partner</span>
+                  <strong style={{ textTransform: 'capitalize' }}>{order.courier}</strong>
+                </p>
+              ) : null}
+            </div>
+
+            {order.trackingUrl ? (
+              <a
+                href={/^https?:\/\//i.test(order.trackingUrl) ? order.trackingUrl : `https://${order.trackingUrl}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="od-action od-action--primary"
+                style={{ textDecoration: 'none' }}
+              >
+                Track Shipment
+                <Arrow />
+              </a>
+            ) : null}
+          </div>
+
+          {order.trackingUrl ? (
+            <p className="od-shipment__desc" style={{ marginTop: 4 }}>
+              Your shipment can be tracked live on the delivery partner&apos;s website.
+            </p>
+          ) : (
+            <p className="od-note" style={{ marginTop: 0 }}>
+              Tracking information is not available yet. Please check back later.
+            </p>
+          )}
+        </section>
+      ) : null}
 
       <section className="od-block" aria-labelledby="od-items-heading">
         <div className="od-block__head">

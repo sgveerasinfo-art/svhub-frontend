@@ -847,4 +847,108 @@
   color: #2d3748;
 }
 
+/* ── Shipment Details Section ─────────────────────────────────────────────── */
 
+.od-shipment {
+  padding: 28px 32px;
+  border: 1px solid var(--od-line, rgba(0,0,0,0.1));
+  border-radius: 12px;
+  display: grid;
+  gap: 16px;
+  background: #fff;
+}
+
+.od-shipment__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.od-shipment__head > div {
+  display: grid;
+  gap: 10px;
+}
+
+.od-shipment__provider {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.od-shipment__provider-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(var(--charcoal-rgb, 44,62,35), 0.48);
+}
+
+.od-shipment__provider strong {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--espresso-brown, #3b2314);
+}
+
+/* Collapsed — body hidden */
+.od-shipment__body {
+  display: none;
+  grid-template-columns: 1fr;
+  gap: 16px;
+  padding-top: 4px;
+  border-top: 1px solid var(--od-line, rgba(0,0,0,0.08));
+}
+
+.od-shipment__body.is-open {
+  display: grid;
+  animation: od-shipment-in 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes od-shipment-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.od-shipment__desc {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: rgba(var(--charcoal-rgb, 44,62,35), 0.72);
+}
+
+/* Secondary "Know More" button */
+.od-action--secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 16px;
+  border: 1.5px solid var(--leaf-green, #5a7a2e);
+  border-radius: 20px;
+  background: transparent;
+  color: var(--leaf-green, #5a7a2e);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 240ms ease, color 240ms ease;
+}
+
+.od-action--secondary:hover,
+.od-action--secondary:focus-visible {
+  background: var(--leaf-green, #5a7a2e);
+  color: #fff;
+}
+
+@media (max-width: 480px) {
+  .od-shipment {
+    padding: 20px 18px;
+  }
+  .od-shipment__head {
+    flex-direction: column;
+  }
+}

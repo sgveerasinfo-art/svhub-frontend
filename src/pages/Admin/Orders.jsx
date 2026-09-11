@@ -256,6 +256,10 @@ function OrderView({ order, onClose, onEdit, onOpen }) {
 function StatusForm({ order, onClose, onSave }) {
   const [status, setStatus] = useState(order.status)
   const [paymentStatus, setPaymentStatus] = useState(order.paymentStatus)
+  const [courier, setCourier] = useState(order.courier || '')
+  const [trackingUrl, setTrackingUrl] = useState(order.trackingUrl || '')
+  const [formError, setFormError] = useState('')
+
   const initialDateStr = useMemo(() => {
     if (!order.expectedDeliveryDate) return ''
     const d = new Date(order.expectedDeliveryDate)
@@ -263,16 +267,65 @@ function StatusForm({ order, onClose, onSave }) {
   }, [order.expectedDeliveryDate])
   const [expectedDate, setExpectedDate] = useState(initialDateStr)
   const [busy, setBusy] = useState(false)
+
+  const isShippedStage = ['Shipped', 'Out for Delivery', 'Delivered'].includes(status)
+
   const dirty =
     status !== order.status ||
     paymentStatus !== order.paymentStatus ||
-    expectedDate !== initialDateStr
+    expectedDate !== initialDateStr ||
+    courier !== (order.courier || '') ||
+    trackingUrl !== (order.trackingUrl || '')
 
   async function submit(event) {
     event.preventDefault()
     if (!dirty || busy) return
+    setFormError('')
+
+    let formattedUrl = trackingUrl.trim()
+    if (formattedUrl && !/^https?:\/\//i.test(formattedUrl)) {
+      if (!/^[a-z0-9+-.]+:/i.test(formattedUrl)) {
+        formattedUrl = `https://${formattedUrl}`
+      }
+    }
+
+    if (status === 'Shipped') {
+      const c = courier.trim()
+      if (!c) {
+        setFormError('Delivery Partner (Courier) is required when status is Shipped.')
+        return
+      }
+      if (!formattedUrl) {
+        setFormError('Tracking URL is required when status is Shipped.')
+        return
+      }
+      try {
+        const parsed = new URL(formattedUrl)
+        if (!['http:', 'https:'].includes(parsed.protocol)) {
+          setFormError('Tracking URL must start with http:// or https://')
+          return
+        }
+      } catch {
+        setFormError('Please enter a valid tracking URL (e.g. https://delhivery.com/track/123)')
+        return
+      }
+    } else if (formattedUrl) {
+      try {
+        const parsed = new URL(formattedUrl)
+        if (!['http:', 'https:'].includes(parsed.protocol)) {
+          setFormError('Tracking URL must start with http:// or https://')
+          return
+        }
+      } catch {
+        setFormError('Please enter a valid tracking URL (e.g. https://delhivery.com/track/123)')
+        return
+      }
+    }
+
     setBusy(true)
     const payload = { status, paymentStatus }
+    if (courier !== (order.courier || '')) payload.courier = courier.trim()
+    if (formattedUrl !== (order.trackingUrl || '')) payload.trackingUrl = formattedUrl
     if (expectedDate && expectedDate !== initialDateStr) {
       payload.expectedDeliveryDate = new Date(`${expectedDate}T12:00:00.000Z`).toISOString()
     }
@@ -282,7 +335,7 @@ function StatusForm({ order, onClose, onSave }) {
   }
 
   return (
-    <OrderDialog eyebrow="Fulfillment" title={order.number} copy="Update payment, status, or expected delivery." onClose={onClose}>
+    <OrderDialog eyebrow="Fulfillment" title={order.number} copy="Update payment, status, delivery partner, or tracking URL." onClose={onClose}>
       <form className="admin-orders-form" onSubmit={submit}>
         <div className="admin-orders-form__summary">
           <div className="admin-orders-form__summary-customer">
@@ -306,7 +359,7 @@ function StatusForm({ order, onClose, onSave }) {
               <span>Order status</span>
               <span className="admin-orders-form__current">Current: {order.status}</span>
             </div>
-            <select value={status} onChange={(event) => setStatus(event.target.value)}>
+            <select value={status} onChange={(event) => { setStatus(event.target.value); setFormError('') }}>
               {ORDER_STATUSES.map((item) => (
                 <option key={item} value={item}>
                   {item}
@@ -314,6 +367,41 @@ function StatusForm({ order, onClose, onSave }) {
               ))}
             </select>
           </label>
+
+          {isShippedStage && (
+            <>
+              <label className="admin-orders-form__field">
+                <div className="admin-orders-form__label-row">
+                  <span>Delivery Partner (Courier) {status === 'Shipped' && <span style={{ color: 'var(--terracotta)' }}>*</span>}</span>
+                  <span className="admin-orders-form__current">Current: {order.courier || 'None'}</span>
+                </div>
+                <input
+                  type="text"
+                  className="admin-orders-form__input"
+                  placeholder="e.g. Delhivery, BlueDart, DTDC"
+                  value={courier}
+                  onChange={(event) => { setCourier(event.target.value); setFormError('') }}
+                  required={status === 'Shipped'}
+                />
+              </label>
+
+              <label className="admin-orders-form__field">
+                <div className="admin-orders-form__label-row">
+                  <span>Tracking URL {status === 'Shipped' && <span style={{ color: 'var(--terracotta)' }}>*</span>}</span>
+                  <span className="admin-orders-form__current">Current: {order.trackingUrl ? 'Set' : 'None'}</span>
+                </div>
+                <input
+                  type="url"
+                  className="admin-orders-form__input"
+                  placeholder="https://www.delhivery.com/track/package/XXXXXX"
+                  value={trackingUrl}
+                  onChange={(event) => { setTrackingUrl(event.target.value); setFormError('') }}
+                  required={status === 'Shipped'}
+                />
+              </label>
+            </>
+          )}
+
           <label className="admin-orders-form__field">
             <div className="admin-orders-form__label-row">
               <span>Payment status</span>
@@ -341,6 +429,12 @@ function StatusForm({ order, onClose, onSave }) {
               onChange={(event) => setExpectedDate(event.target.value)}
             />
           </label>
+
+          {formError && (
+            <p role="alert" style={{ color: 'var(--terracotta)', fontSize: '13px', margin: '6px 0 0', fontWeight: 600 }}>
+              {formError}
+            </p>
+          )}
         </div>
 
         <footer className="admin-orders-dialog__actions">
