@@ -47,7 +47,7 @@ function stampFor(stamps, step) {
   return String(stamps[step] || stamps[step?.toLowerCase()] || '').trim()
 }
 
-export default function OrderTimeline({ status, stamps }) {
+export default function OrderTimeline({ status, stamps, cancellationReason }) {
   const current = timelineIndex(status)
   const cancelled = status === 'Cancelled'
   const progress = cancelled ? 0 : Math.max(0, Math.min(1, current / LAST))
@@ -76,7 +76,10 @@ export default function OrderTimeline({ status, stamps }) {
       </div>
 
       {cancelled ? (
-        <p className="ot__note">This order was cancelled and will not move further.</p>
+        <p className="ot__note">
+          This order was cancelled and will not move further.
+          {cancellationReason ? ` (${cancellationReason})` : ''}
+        </p>
       ) : null}
 
       <p className="ot__sr">{statusSummary(status, current, cancelled)}</p>

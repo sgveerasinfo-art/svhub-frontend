@@ -96,7 +96,7 @@ function OrderDetailContent({ order, onOrderUpdated, toast }) {
   const [criticalModal, setCriticalModal] = useState(null)
   const [courierInput, setCourierInput] = useState(order.courier || 'BlueDart Express')
   const [trackingInput, setTrackingInput] = useState(order.trackingNumber || `BLU-${cleanSlug(order.number).toUpperCase()}`)
-  const [cancelReasonInput, setCancelReasonInput] = useState('Customer requested cancellation')
+  const [cancelReasonInput, setCancelReasonInput] = useState('')
 
   const headerTitle = useMemo(() => {
     if (!order.number) return 'Order #SVH12345'
@@ -132,7 +132,7 @@ function OrderDetailContent({ order, onOrderUpdated, toast }) {
     try {
       let res
       if (newStatus === 'Cancelled') {
-        const reason = extra.note || cancelReasonInput.trim() || 'Order cancelled by administration.'
+        const reason = extra.note || cancelReasonInput.trim() || 'Order cancelled by SV Hub Administration'
         res = await cancelAdminOrder(order.id, reason)
       } else {
         const patch = {
@@ -170,7 +170,7 @@ function OrderDetailContent({ order, onOrderUpdated, toast }) {
       })
     } else if (targetStatus === 'Cancelled') {
       applyStatusUpdate('Cancelled', {
-        note: cancelReasonInput.trim() || 'Order cancelled by administration.',
+        note: cancelReasonInput.trim() || 'Order cancelled by SV Hub Administration',
       })
     }
   }
@@ -261,6 +261,45 @@ function OrderDetailContent({ order, onOrderUpdated, toast }) {
           </AdminButton>
         </div>
       </header>
+
+      {/* Cancellation Insight Banner — shown when order is CANCELLED */}
+      {isCancelled && (() => {
+        const cancelEvent = order.history
+          ? [...order.history].reverse().find((h) => h.status === 'CANCELLED' || h.status === 'Cancelled')
+          : null
+        const byRole = order.cancelledByRole || cancelEvent?.cancelledBy || null
+        const reason = order.cancellationReason || cancelEvent?.note || null
+        const cancelledAt = cancelEvent?.at ? formatAdminDateTime(cancelEvent.at) : null
+
+        const isAdminCancel = byRole === 'admin'
+        const isCustomerCancel = byRole === 'customer'
+
+        return (
+          <div className={`admin-cancel-insight ${isAdminCancel ? 'admin-cancel-insight--admin' : isCustomerCancel ? 'admin-cancel-insight--customer' : 'admin-cancel-insight--unknown'}`}>
+            <div className="admin-cancel-insight__icon">
+              <Icon name="alert" size={20} />
+            </div>
+            <div className="admin-cancel-insight__body">
+              <div className="admin-cancel-insight__who">
+                {isAdminCancel && <span className="admin-cancel-tag admin-cancel-tag--admin">Cancelled by Admin</span>}
+                {isCustomerCancel && <span className="admin-cancel-tag admin-cancel-tag--customer">Cancelled by Customer</span>}
+                {!byRole && <span className="admin-cancel-tag admin-cancel-tag--unknown">Order Cancelled</span>}
+                {cancelledAt && <span className="admin-cancel-insight__time">{cancelledAt}</span>}
+              </div>
+              <p className="admin-cancel-insight__reason">
+                <strong>Reason:</strong>{' '}
+                {reason || (isAdminCancel ? 'Order cancelled by SV Hub Administration' : isCustomerCancel ? 'Cancelled by customer' : 'No reason recorded')}
+              </p>
+              {['PAID', 'SUCCESS', 'REFUNDED', 'PARTIALLY_REFUNDED'].includes(order.rawPaymentStatus) && (
+                <p className="admin-cancel-insight__refund">
+                  <Icon name="credit-card" size={13} />
+                  <span>Payment was captured — refund may have been auto-initiated. Check Payment Information below.</span>
+                </p>
+              )}
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Main 2-Column Dashboard Grid */}
       <div className="admin-order-grid">
@@ -792,19 +831,21 @@ function OrderDetailContent({ order, onOrderUpdated, toast }) {
                 <div className="admin-confirm-modal__alert admin-confirm-modal__alert--warning">
                   <Icon name="alert" size={18} />
                   <span>
-                    Are you sure you want to cancel <strong>{order.number}</strong>? Please provide a cancellation reason below.
+                    Are you sure you want to cancel <strong>{order.number}</strong>? You may provide an optional reason below.
                   </span>
                 </div>
                 <div className="admin-confirm-field">
-                  <label htmlFor="cancel-reason-input">Cancellation Reason</label>
+                  <label htmlFor="cancel-reason-input">Cancellation Reason (optional)</label>
                   <input
                     id="cancel-reason-input"
                     type="text"
                     value={cancelReasonInput}
                     onChange={(e) => setCancelReasonInput(e.target.value)}
-                    placeholder="e.g. Customer requested cancellation"
-                    required
+                    placeholder="e.g. Customer requested via phone, out of stock (optional)"
                   />
+                  <span style={{ fontSize: '11px', color: 'var(--admin-mute)', marginTop: '4px', display: 'block' }}>
+                    If left blank, the customer order page will show &ldquo;Order cancelled by SV Hub Administration&rdquo;.
+                  </span>
                 </div>
               </div>
             )}

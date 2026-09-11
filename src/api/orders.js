@@ -36,3 +36,16 @@ export async function getOrders(limit = 20) {
 export async function getOrder(id) {
   return apiFetch(`/orders/${encodeURIComponent(id)}`, { auth: true })
 }
+
+/**
+ * Cancel a customer order.
+ * @param {string} id - Order MongoDB ObjectId
+ * @param {string} [reason] - Optional cancellation reason
+ */
+export async function cancelOrder(id, reason = '') {
+  return apiFetch(`/orders/${encodeURIComponent(id)}/cancel`, {
+    method: 'POST',
+    body: { reason },
+    auth: true,
+  })
+}

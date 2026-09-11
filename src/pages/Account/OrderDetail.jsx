@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { formatPrice } from '../../utils/money.js'
-import { getOrder } from '../../api/orders.js'
+import { getOrder, cancelOrder } from '../../api/orders.js'
 import { formatOrderDate, formatDeliveryDate } from '../../data/account.js'
 import OrderTimeline from '../../components/order/OrderTimeline.jsx'
 import AccountLoginPrompt from './AccountLoginPrompt.jsx'
@@ -81,15 +81,20 @@ function Arrow({ back = false }) {
 }
 
 function StatusLine({ label, value }) {
-  const pending = String(value).toLowerCase() === 'pending' || String(value).toLowerCase() === 'failed'
+  const v = String(value || '').trim()
+  if (!v) return null
+  const tone =
+    v === 'Paid' || v === 'Delivered'
+      ? 'paid'
+      : v === 'Cancelled' || v === 'Failed'
+        ? 'cancelled'
+        : 'pending'
+
   return (
-    <p className={`od-status${pending ? ' is-pending' : ''}`}>
-      <span>{label}</span>
-      <span className="od-status__value">
-        <span className="od-status__dot" aria-hidden="true" />
-        {value}
-      </span>
-    </p>
+    <div className={`od-badge od-badge--${tone}`}>
+      <span className="od-badge__kicker">{label}</span>
+      <span className="od-badge__val">{v}</span>
+    </div>
   )
 }
 
@@ -101,7 +106,14 @@ function OrderDetail() {
   const [notFound, setNotFound] = useState(false)
   const [error, setError] = useState('')
 
-  useEffect(() => {
+  // Cancellation states
+  const [cancelModalOpen, setCancelModalOpen] = useState(false)
+  const [cancelReason, setCancelReason] = useState('')
+  const [cancelling, setCancelling] = useState(false)
+  const [cancelError, setCancelError] = useState('')
+  const [cancelSuccessMsg, setCancelSuccessMsg] = useState('')
+
+  const fetchOrderDetail = () => {
     if (!user || !orderId) return
     setLoading(true)
     setNotFound(false)
@@ -110,13 +122,27 @@ function OrderDetail() {
     getOrder(orderId)
       .then((res) => {
         const raw = res.data
+        const cancelHistory = Array.isArray(raw.history)
+          ? [...raw.history].reverse().find((h) => h.status === 'CANCELLED')
+          : null
+        const cancellationReason =
+          raw.cancellationReason ||
+          cancelHistory?.note ||
+          (String(raw.status || '').toUpperCase() === 'CANCELLED'
+            ? 'Order cancelled by SV Hub Administration'
+            : '')
+
         setOrder({
           id: raw.id,
+          rawStatus: String(raw.status || '').toUpperCase(),
           number: raw.orderNumber,
           date: raw.createdAt,
           status: mapStatus(raw.status),
+          cancellationReason,
+          history: raw.history || [],
           expectedDeliveryDate: raw.expectedDeliveryDate || null,
           paymentStatus: mapPaymentStatus(raw.paymentStatus),
+          rawPaymentStatus: String(raw.paymentStatus || '').toUpperCase(),
           payment: raw.paymentMethod || null,
           amount: raw.totalAmount,
           subtotal: raw.subtotal,
@@ -140,7 +166,31 @@ function OrderDetail() {
         else setError(err.message || 'Could not load order.')
       })
       .finally(() => setLoading(false))
+  }
+
+  useEffect(() => {
+    fetchOrderDetail()
   }, [user, orderId])
+
+  const handleCancelSubmit = async (e) => {
+    e.preventDefault()
+    if (!order?.id || cancelling) return
+    setCancelling(true)
+    setCancelError('')
+    setCancelSuccessMsg('')
+
+    try {
+      const res = await cancelOrder(order.id, cancelReason)
+      setCancelSuccessMsg(res.message || 'Order cancelled successfully.')
+      setCancelModalOpen(false)
+      setCancelReason('')
+      fetchOrderDetail()
+    } catch (err) {
+      setCancelError(err.message || 'Failed to cancel order.')
+    } finally {
+      setCancelling(false)
+    }
+  }
 
   if (!user) {
     return (
@@ -225,7 +275,7 @@ function OrderDetail() {
         </div>
       </header>
 
-      {order.expectedDeliveryDate ? (
+      {order.expectedDeliveryDate && order.rawStatus !== 'CANCELLED' ? (
         <section className="od-delivery" aria-label="Delivery Estimation">
           <div className="od-delivery__badge">
             <span className="od-delivery__icon" aria-hidden="true">
@@ -255,7 +305,33 @@ function OrderDetail() {
         </section>
       ) : null}
 
-      <OrderTimeline status={order.status} />
+      {order.rawStatus === 'CANCELLED' ? (
+        <section className="od-cancellation-banner" aria-label="Cancellation notice">
+          <div className="od-cancellation-banner__icon" aria-hidden="true">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
+              <path d="m15 9-6 6M9 9l6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+          </div>
+          <div className="od-cancellation-banner__content">
+            <h2 className="od-cancellation-banner__title">Order Cancelled</h2>
+            <p className="od-cancellation-banner__reason">
+              <strong>Status:</strong> {order.cancellationReason || 'Order cancelled by SV Hub Administration'}
+            </p>
+            {['PAID', 'SUCCESS', 'REFUNDED', 'PARTIALLY_REFUNDED'].includes(order.rawPaymentStatus) ? (
+              <p className="od-cancellation-banner__refund">
+                <strong>Payment & Refund:</strong> Payment status is <em>{order.paymentStatus || 'Refunded'}</em>. Any captured funds are automatically refunded to your original payment method.
+              </p>
+            ) : (
+              <p className="od-cancellation-banner__refund">
+                No payment was charged for this order.
+              </p>
+            )}
+          </div>
+        </section>
+      ) : null}
+
+      <OrderTimeline status={order.status} cancellationReason={order.cancellationReason} />
 
       <section className="od-block" aria-labelledby="od-items-heading">
         <div className="od-block__head">
@@ -364,7 +440,27 @@ function OrderDetail() {
         </div>
       </div>
 
+      {cancelSuccessMsg ? (
+        <div className="od-alert od-alert--success" role="status">
+          <p>{cancelSuccessMsg}</p>
+        </div>
+      ) : null}
+
+      {/* Show Cancel Order button only when eligible (Pending, Confirmed, Processing) */}
       <div className="od-actions">
+        {['PENDING_PAYMENT', 'CONFIRMED', 'PROCESSING'].includes(order.rawStatus) && order.rawStatus !== 'CANCELLED' ? (
+          <button
+            type="button"
+            className="od-action od-action--cancel"
+            onClick={() => {
+              setCancelError('')
+              setCancelModalOpen(true)
+            }}
+          >
+            Cancel order
+          </button>
+        ) : null}
+
         <Link to="/shop" className="od-action od-action--primary">
           Continue shopping
           <Arrow />
@@ -374,6 +470,59 @@ function OrderDetail() {
           <Arrow />
         </Link>
       </div>
+
+      {cancelModalOpen ? (
+        <div className="od-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="cancel-modal-title">
+          <div className="od-modal">
+            <h2 id="cancel-modal-title" className="od-modal__title">Cancel Order</h2>
+            <p className="od-modal__desc">
+              Are you sure you want to cancel this order?
+              {order.rawPaymentStatus === 'PAID' ? ' Since payment was received, an automatic refund will be processed to your original payment method.' : ''}
+            </p>
+
+            {cancelError ? (
+              <p className="od-modal__error" role="alert">{cancelError}</p>
+            ) : null}
+
+            <form onSubmit={handleCancelSubmit}>
+              <div className="od-modal__field">
+                <label htmlFor="cancel-reason" className="od-modal__label">
+                  Reason for cancellation (optional)
+                </label>
+                <textarea
+                  id="cancel-reason"
+                  className="od-modal__textarea"
+                  rows="3"
+                  value={cancelReason}
+                  onChange={(e) => setCancelReason(e.target.value)}
+                  placeholder="e.g., Ordered by mistake, found a better price, changed shipping address..."
+                  disabled={cancelling}
+                />
+              </div>
+
+              <div className="od-modal__buttons">
+                <button
+                  type="button"
+                  className="od-modal__btn od-modal__btn--secondary"
+                  onClick={() => {
+                    if (!cancelling) setCancelModalOpen(false)
+                  }}
+                  disabled={cancelling}
+                >
+                  Keep Order
+                </button>
+                <button
+                  type="submit"
+                  className="od-modal__btn od-modal__btn--danger"
+                  disabled={cancelling}
+                >
+                  {cancelling ? 'Cancelling…' : 'Confirm Cancellation'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
     </article>
   )
 }
