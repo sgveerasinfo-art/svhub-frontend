@@ -79,7 +79,20 @@ function Settings() {
   }
 
   function setHeroMode(mode) {
-    setCampaign('enabled', mode === 'campaign')
+    const enabled = mode === 'campaign'
+    setForm({
+      ...value,
+      heroCampaign: {
+        ...campaign,
+        enabled,
+        // Keep UI status in sync with the selected mode before save.
+        status: enabled
+          ? campaign.status && campaign.status !== 'disabled'
+            ? campaign.status
+            : 'scheduled'
+          : 'disabled',
+      },
+    })
   }
 
   async function save(event) {
@@ -88,19 +101,22 @@ function Settings() {
     if (!value.supportEmail || !value.supportEmail.includes('@')) nextErrors.supportEmail = 'Enter a valid email.'
     if (!(Number(value.standardShipping) >= 0)) nextErrors.standardShipping = 'Enter shipping in rupees.'
 
-    if (!String(campaign.label || '').trim()) nextErrors.campaignLabel = 'Enter a campaign label.'
-    if (!String(campaign.title || '').trim()) nextErrors.campaignTitle = 'Enter a headline.'
-    if (!String(campaign.subtitle || '').trim()) nextErrors.campaignSubtitle = 'Enter supporting copy.'
-    if (!String(campaign.ctaLabel || '').trim()) nextErrors.campaignCta = 'Enter CTA text.'
-    if (!String(campaign.ctaTo || '').startsWith('/')) nextErrors.campaignCtaTo = 'CTA path must start with /.'
-    const discount = Number(campaign.discountPercent)
-    if (!Number.isFinite(discount) || discount < 0 || discount > 100) {
-      nextErrors.campaignDiscount = 'Discount must be 0–100.'
-    }
-    if (!campaign.startAtLocal) nextErrors.campaignStart = 'Choose a start date/time.'
-    if (!campaign.endAtLocal) nextErrors.campaignEnd = 'Choose an end date/time.'
-    if (campaign.startAtLocal && campaign.endAtLocal && campaign.endAtLocal <= campaign.startAtLocal) {
-      nextErrors.campaignEnd = 'End must be after start.'
+    const campaignEnabled = Boolean(campaign.enabled)
+    if (campaignEnabled) {
+      if (!String(campaign.label || '').trim()) nextErrors.campaignLabel = 'Enter a campaign label.'
+      if (!String(campaign.title || '').trim()) nextErrors.campaignTitle = 'Enter a headline.'
+      if (!String(campaign.subtitle || '').trim()) nextErrors.campaignSubtitle = 'Enter supporting copy.'
+      if (!String(campaign.ctaLabel || '').trim()) nextErrors.campaignCta = 'Enter CTA text.'
+      if (!String(campaign.ctaTo || '').startsWith('/')) nextErrors.campaignCtaTo = 'CTA path must start with /.'
+      const discount = Number(campaign.discountPercent)
+      if (!Number.isFinite(discount) || discount < 0 || discount > 100) {
+        nextErrors.campaignDiscount = 'Discount must be 0–100.'
+      }
+      if (!campaign.startAtLocal) nextErrors.campaignStart = 'Choose a start date/time.'
+      if (!campaign.endAtLocal) nextErrors.campaignEnd = 'Choose an end date/time.'
+      if (campaign.startAtLocal && campaign.endAtLocal && campaign.endAtLocal <= campaign.startAtLocal) {
+        nextErrors.campaignEnd = 'End must be after start.'
+      }
     }
 
     setErrors(nextErrors)
@@ -111,6 +127,7 @@ function Settings() {
 
     setSaving(true)
     try {
+      const savedCampaign = settings?.heroCampaign || emptyCampaign()
       const payload = {
         supportEmail: value.supportEmail,
         supportPhone: value.supportPhone,
@@ -121,24 +138,29 @@ function Settings() {
         lowStockThreshold: Number(value.lowStockAlert) || 10,
         lowStockAlert: Number(value.lowStockAlert) || 10,
         heroCampaign: {
-          enabled: Boolean(campaign.enabled),
-          label: String(campaign.label).trim(),
-          title: String(campaign.title).trim(),
-          subtitle: String(campaign.subtitle).trim(),
-          discountPercent: Number(campaign.discountPercent),
-          urgencyLabel: String(campaign.urgencyLabel || '').trim(),
-          ctaLabel: String(campaign.ctaLabel).trim(),
-          ctaTo: String(campaign.ctaTo).trim() || '/shop',
-          imageUrl: String(campaign.imageUrl || '').trim(),
-          imageAlt: String(campaign.imageAlt || '').trim(),
-          startAt: campaign.startAtLocal,
-          endAt: campaign.endAtLocal,
+          enabled: campaignEnabled,
+          label: String(campaign.label || savedCampaign.label || 'Ganesh Chaturthi Special').trim(),
+          title: String(campaign.title || savedCampaign.title || '').trim(),
+          subtitle: String(campaign.subtitle || savedCampaign.subtitle || '').trim(),
+          discountPercent: Number(campaign.discountPercent ?? savedCampaign.discountPercent ?? 10),
+          urgencyLabel: String(campaign.urgencyLabel || savedCampaign.urgencyLabel || '').trim(),
+          ctaLabel:
+            String(campaign.ctaLabel || savedCampaign.ctaLabel || '').trim() || 'Shop the Celebration',
+          ctaTo: String(campaign.ctaTo || savedCampaign.ctaTo || '').trim() || '/shop',
+          imageUrl: String(campaign.imageUrl || savedCampaign.imageUrl || '').trim(),
+          imageAlt: String(campaign.imageAlt || savedCampaign.imageAlt || '').trim(),
+          startAt: campaign.startAtLocal || savedCampaign.startAtLocal,
+          endAt: campaign.endAtLocal || savedCampaign.endAtLocal,
         },
       }
       const res = await updateAdminSettings(payload)
       setSettings(res.data)
       setForm(null)
-      toast.success('Settings saved')
+      toast.success(
+        campaignEnabled
+          ? 'Festival campaign settings saved'
+          : 'Normal hero enabled — festival campaign is off',
+      )
     } catch (err) {
       toast.error(err.message || 'Failed to save settings.')
     } finally {
@@ -163,8 +185,18 @@ function Settings() {
       })
   }
 
-  const status = campaign.status || (campaign.enabled ? 'scheduled' : 'disabled')
+  const hasUnsaved = Boolean(form)
+  const status = !campaign.enabled
+    ? 'disabled'
+    : campaign.status && campaign.status !== 'disabled'
+      ? campaign.status
+      : 'scheduled'
   const mode = campaign.enabled ? 'campaign' : 'normal'
+  const liveHomepageMode = settings?.heroCampaign?.enabled
+    ? settings?.heroCampaign?.status === 'active'
+      ? 'campaign'
+      : 'normal'
+    : 'normal'
   const previewTitle = useMemo(
     () =>
       String(campaign.title || '')
@@ -254,15 +286,41 @@ function Settings() {
 
         <p
           style={{
-            margin: '0 0 18px',
+            margin: '0 0 10px',
             padding: '10px 12px',
             borderRadius: 10,
             background: 'rgba(59,70,50,0.06)',
             fontSize: 13,
           }}
         >
+          Selected mode: <strong>{mode === 'campaign' ? 'Festival Campaign' : 'Normal Hero'}</strong>
+          {' · '}
           Status: <strong>{status}</strong>
           {STATUS_COPY[status] ? ` — ${STATUS_COPY[status]}` : ''}
+        </p>
+
+        <p
+          style={{
+            margin: '0 0 18px',
+            padding: '10px 12px',
+            borderRadius: 10,
+            background: hasUnsaved ? 'rgba(170,87,51,0.1)' : 'rgba(59,70,50,0.04)',
+            color: hasUnsaved ? '#6b3a24' : 'rgba(0,0,0,0.62)',
+            fontSize: 13,
+          }}
+        >
+          {hasUnsaved ? (
+            <>
+              Unsaved change — homepage still shows{' '}
+              <strong>{liveHomepageMode === 'campaign' ? 'Festival Campaign' : 'Normal Hero'}</strong>
+              . Click <strong>Save settings</strong> to apply.
+            </>
+          ) : (
+            <>
+              Homepage currently shows{' '}
+              <strong>{liveHomepageMode === 'campaign' ? 'Festival Campaign' : 'Normal Hero'}</strong>.
+            </>
+          )}
         </p>
 
         <div className="admin-form-grid">
