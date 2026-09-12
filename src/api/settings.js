@@ -7,9 +7,10 @@ const API_URL = import.meta.env.VITE_API_URL || '/api'
 export async function getPublicSettings({ signal } = {}) {
   let response
   try {
-    response = await fetch(`${API_URL}/settings/public`, {
+    response = await fetch(`${API_URL}/settings/public?_=${Date.now()}`, {
       method: 'GET',
-      headers: { Accept: 'application/json' },
+      headers: { Accept: 'application/json', 'Cache-Control': 'no-cache' },
+      cache: 'no-store',
       signal,
     })
   } catch (error) {

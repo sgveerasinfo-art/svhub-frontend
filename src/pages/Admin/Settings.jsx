@@ -78,21 +78,61 @@ function Settings() {
     })
   }
 
-  function setHeroMode(mode) {
+  async function setHeroMode(mode) {
     const enabled = mode === 'campaign'
+    const nextCampaign = {
+      ...campaign,
+      enabled,
+      status: enabled
+        ? campaign.status && campaign.status !== 'disabled'
+          ? campaign.status
+          : 'scheduled'
+        : 'disabled',
+    }
     setForm({
       ...value,
-      heroCampaign: {
-        ...campaign,
-        enabled,
-        // Keep UI status in sync with the selected mode before save.
-        status: enabled
-          ? campaign.status && campaign.status !== 'disabled'
-            ? campaign.status
-            : 'scheduled'
-          : 'disabled',
-      },
+      heroCampaign: nextCampaign,
     })
+
+    setSaving(true)
+    try {
+      const savedCampaign = settings?.heroCampaign || emptyCampaign()
+      const res = await updateAdminSettings({
+        heroCampaign: {
+          enabled,
+          label: String(nextCampaign.label || savedCampaign.label || 'Ganesh Chaturthi Special').trim(),
+          title: String(nextCampaign.title || savedCampaign.title || '').trim(),
+          subtitle: String(nextCampaign.subtitle || savedCampaign.subtitle || '').trim(),
+          discountPercent: Number(nextCampaign.discountPercent ?? savedCampaign.discountPercent ?? 10),
+          urgencyLabel: String(nextCampaign.urgencyLabel || savedCampaign.urgencyLabel || '').trim(),
+          ctaLabel:
+            String(nextCampaign.ctaLabel || savedCampaign.ctaLabel || '').trim() || 'Shop the Celebration',
+          ctaTo: String(nextCampaign.ctaTo || savedCampaign.ctaTo || '').trim() || '/shop',
+          imageUrl: String(nextCampaign.imageUrl || savedCampaign.imageUrl || '').trim(),
+          imageAlt: String(nextCampaign.imageAlt || savedCampaign.imageAlt || '').trim(),
+          startAt: nextCampaign.startAtLocal || savedCampaign.startAtLocal,
+          endAt: nextCampaign.endAtLocal || savedCampaign.endAtLocal,
+        },
+      })
+      setSettings(res.data)
+      setForm(null)
+      toast.success(
+        enabled
+          ? 'Festival campaign enabled — homepage updates when the date window is active'
+          : 'Normal hero is now live on the homepage',
+      )
+    } catch (err) {
+      toast.error(err.message || 'Could not update hero mode.')
+      try {
+        const res = await getAdminSettings()
+        setSettings(res.data)
+        setForm(null)
+      } catch {
+        /* ignore */
+      }
+    } finally {
+      setSaving(false)
+    }
   }
 
   async function save(event) {
@@ -263,14 +303,16 @@ function Settings() {
 
         <h2 style={{ margin: '0 0 8px', fontSize: 18 }}>Hero campaign</h2>
         <p style={{ margin: '0 0 16px', color: 'rgba(0,0,0,0.62)', fontSize: 14, lineHeight: 1.55 }}>
-          Schedule a temporary festival homepage hero. When disabled or outside the date window, the existing normal
-          hero is shown automatically. Times use Asia/Kolkata.
+          Choose which homepage hero is live. Clicking <strong>Normal Hero</strong> or{' '}
+          <strong>Festival Campaign</strong> saves that mode immediately. Edit festival copy below, then use{' '}
+          <strong>Save settings</strong> for text/date changes. Times use Asia/Kolkata.
         </p>
 
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
           <AdminButton
             type="button"
             variant={mode === 'normal' ? 'primary' : 'ghost'}
+            disabled={saving}
             onClick={() => setHeroMode('normal')}
           >
             Normal Hero
@@ -278,6 +320,7 @@ function Settings() {
           <AdminButton
             type="button"
             variant={mode === 'campaign' ? 'primary' : 'ghost'}
+            disabled={saving}
             onClick={() => setHeroMode('campaign')}
           >
             Festival Campaign
@@ -309,17 +352,14 @@ function Settings() {
             fontSize: 13,
           }}
         >
+          Homepage currently shows{' '}
+          <strong>{liveHomepageMode === 'campaign' ? 'Festival Campaign' : 'Normal Hero'}</strong>
           {hasUnsaved ? (
             <>
-              Unsaved change — homepage still shows{' '}
-              <strong>{liveHomepageMode === 'campaign' ? 'Festival Campaign' : 'Normal Hero'}</strong>
-              . Click <strong>Save settings</strong> to apply.
+              . You have unsaved campaign field edits — click <strong>Save settings</strong> to update copy/dates.
             </>
           ) : (
-            <>
-              Homepage currently shows{' '}
-              <strong>{liveHomepageMode === 'campaign' ? 'Festival Campaign' : 'Normal Hero'}</strong>.
-            </>
+            '.'
           )}
         </p>
 

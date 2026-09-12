@@ -20,10 +20,7 @@
   max-width: 14em;
   margin-inline: auto;
   padding-bottom: 0.28em;
-  font-family: 'Fraunces', var(--font-display), Georgia, serif;
-  font-weight: 600;
-  font-optical-sizing: auto;
-  font-variation-settings: 'opsz' 144, 'SOFT' 70, 'WONK' 0.4;
+  font-weight: 400;
   letter-spacing: -0.028em;
   line-height: 1.18;
   overflow: visible;

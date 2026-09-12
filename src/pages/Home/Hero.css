@@ -36,54 +36,44 @@
 }
 
 .hero__eyebrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   margin: 0;
-  color: var(--terracotta);
+  color: #6e8c28;
   font-family: var(--font-body);
   font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.18em;
+  font-weight: 500;
+  letter-spacing: 2px;
   text-transform: uppercase;
+}
+
+.hero__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #6e8c28;
 }
 
 .hero h1 {
   margin: 18px 0 16px;
-  padding-bottom: 0.2em;
-  color: var(--espresso-brown);
-  font-family: 'Fraunces', var(--font-display), Georgia, serif;
+  color: #1f2e1f;
+  font-family: 'Playfair Display', Georgia, 'Times New Roman', serif;
   font-size: clamp(32px, 6.2vw, 64px);
   font-weight: 600;
-  font-optical-sizing: auto;
-  font-variation-settings: 'opsz' 144, 'SOFT' 70, 'WONK' 0.4;
-  letter-spacing: -0.028em;
-  line-height: 1.12;
-  overflow: visible;
+  letter-spacing: -0.025em;
+  line-height: 1.15;
   text-wrap: balance;
-}
-
-.hero__goodness {
-  position: relative;
-  display: inline-block;
-  white-space: nowrap;
-}
-
-.hero__goodness svg {
-  position: absolute;
-  left: -3%;
-  bottom: -0.22em;
-  width: 108%;
-  height: 0.42em;
-  overflow: visible;
-  color: var(--terracotta);
-  pointer-events: none;
 }
 
 .hero__description {
   max-width: 700px;
   margin: 0 auto 28px;
-  color: var(--charcoal-green);
+  color: #4b4b4b;
   font-family: var(--font-body);
   font-size: 16px;
-  font-weight: 300;
+  font-weight: 400;
   line-height: 1.7;
 }
 

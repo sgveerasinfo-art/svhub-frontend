@@ -3,7 +3,7 @@ import { getPublicSettings } from '../../api/settings.js'
 import CampaignHero from './CampaignHero.jsx'
 import NormalHero from './NormalHero.jsx'
 
-const REVALIDATE_MS = 45000
+const REVALIDATE_MS = 15000
 
 /**
  * Chooses NormalHero vs CampaignHero from public settings.
@@ -53,12 +53,17 @@ function HeroRenderer() {
     function onVisibility() {
       if (document.visibilityState === 'visible') load()
     }
+    function onFocus() {
+      load()
+    }
     document.addEventListener('visibilitychange', onVisibility)
+    window.addEventListener('focus', onFocus)
 
     return () => {
       controller.abort()
       window.clearInterval(interval)
       document.removeEventListener('visibilitychange', onVisibility)
+      window.removeEventListener('focus', onFocus)
     }
   }, [load])
 
