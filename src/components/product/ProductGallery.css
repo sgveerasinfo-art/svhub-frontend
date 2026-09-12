@@ -5,6 +5,11 @@
   align-items: start;
 }
 
+/* One image: no thumbs column — stage must span full gallery width */
+.pdp-gallery--single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .pdp-gallery__stage {
   position: relative;
   overflow: hidden;

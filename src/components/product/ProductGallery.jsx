@@ -37,8 +37,13 @@ function ProductGallery({ images, name, discount, accent }) {
 
   if (!current) return null
 
+  const multi = images.length > 1
+
   return (
-    <div className="pdp-gallery" style={{ '--gallery-accent': accent }}>
+    <div
+      className={`pdp-gallery${multi ? '' : ' pdp-gallery--single'}`}
+      style={{ '--gallery-accent': accent }}
+    >
       <div
         className="pdp-gallery__stage"
         tabIndex={0}
@@ -61,7 +66,7 @@ function ProductGallery({ images, name, discount, accent }) {
           </p>
         ) : null}
 
-        {images.length > 1 ? (
+        {multi ? (
           <div className="pdp-gallery__dots" aria-hidden="true">
             {images.map((image, index) => (
               <span key={`${image.src}-dot`} className={index === active ? 'is-active' : undefined} />
@@ -69,7 +74,7 @@ function ProductGallery({ images, name, discount, accent }) {
           </div>
         ) : null}
 
-        {images.length > 1 ? (
+        {multi ? (
           <>
             <button
               type="button"
@@ -91,7 +96,7 @@ function ProductGallery({ images, name, discount, accent }) {
         ) : null}
       </div>
 
-      {images.length > 1 ? (
+      {multi ? (
         <ul className="pdp-gallery__thumbs" aria-label="Product photographs">
           {images.map((image, index) => (
             <li key={`${image.src}-${index}`}>
