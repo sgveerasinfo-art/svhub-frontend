@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { heroContent } from '../../data/home.js'
+import { primaryDestinations } from '../../data/navigation.js'
 import './Hero.css'
 
 function Star({ className }) {
@@ -40,6 +41,15 @@ function Hero() {
               />
             </svg>
           </Link>
+
+          <nav className="hero__destinations" aria-label="Explore destinations">
+            {primaryDestinations.map((link) => (
+              <Link key={link.to} to={link.to} className="hero__destination">
+                {link.label}
+                <span aria-hidden="true">→</span>
+              </Link>
+            ))}
+          </nav>
         </div>
       </div>
 

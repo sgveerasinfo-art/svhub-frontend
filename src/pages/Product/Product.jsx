@@ -283,7 +283,7 @@ function Product() {
 function ProductView({ product, related }) {
   const [recent] = useState(() => readViewed(product.id, 4))
   const navigate = useNavigate()
-  const { addItem, setItemQuantity, quantityOf, items } = useCart()
+  const { addItem, setItemQuantity, adjustItemQuantity, quantityOf, items } = useCart()
   const [variantId, setVariantId] = useState(product.variants[0]?.id ?? '')
   const actionsRef = useRef(null)
   const [showSticky, setShowSticky] = useState(false)
@@ -360,8 +360,7 @@ function ProductView({ product, related }) {
     stock,
   }
 
-  // Look up quantity: check items by itemId (logged in) or by product+variant (guest)
-  const cartItemKey = `${product.id}::${cartProduct.variantId}`
+  // Look up quantity: check items by product+variant (logged in or guest)
   const quantity = useMemo(() => {
     // Try to find in backend cart items first (itemId-keyed)
     const backendItem = items.find(
@@ -376,17 +375,49 @@ function ProductView({ product, related }) {
 
   function handleQuantity(next) {
     if (outOfStock) return
+    const qty = Math.max(0, Number(next) || 0)
     const backendItem = items.find(
       (item) => item.productId === product.id && item.variantId === cartProduct.variantId,
     )
-    if (backendItem) {
-      setItemQuantity(backendItem, next)
-    } else {
-      setItemQuantity(cartProduct, next)
+
+    if (qty === 0) {
+      if (backendItem) setItemQuantity(backendItem, 0)
+      else if (inCart) setItemQuantity(cartProduct, 0)
+      return
     }
+
+    if (backendItem) {
+      setItemQuantity(backendItem, qty)
+      return
+    }
+
+    if (inCart) {
+      setItemQuantity(cartProduct, qty)
+      return
+    }
+
+    // Not in cart yet — typed absolute qty should still work
+    addItem(cartProduct, qty)
+  }
+
+  function handleAdjust(delta) {
+    if (outOfStock) return
+    if (!inCart && delta > 0) {
+      addItem(cartProduct, delta)
+      return
+    }
+    const backendItem = items.find(
+      (item) => item.productId === product.id && item.variantId === cartProduct.variantId,
+    )
+    adjustItemQuantity(backendItem || cartProduct, delta)
   }
 
   function handleAdd() {
+    if (outOfStock) return
+    addItem(cartProduct, 1)
+  }
+
+  function handleStickyAdd() {
     if (outOfStock) return
     if (inCart) {
       navigate('/cart')
@@ -401,7 +432,8 @@ function ProductView({ product, related }) {
     navigate('/cart')
   }
 
-  const addLabel = outOfStock ? 'Out of stock' : inCart ? 'Go to cart' : 'Add to cart'
+  const addLabel = outOfStock ? 'Out of stock' : 'Add to cart'
+  const stickyAddLabel = outOfStock ? 'Out of stock' : inCart ? 'Go to cart' : 'Add to cart'
 
   return (
     <div className={`pdp pdp--${accentToken}`} style={{ '--pdp-accent': accent }}>
@@ -486,6 +518,7 @@ function ProductView({ product, related }) {
                 <QuantitySelector
                   value={quantity}
                   onChange={handleQuantity}
+                  onAdjust={handleAdjust}
                   min={0}
                   disabled={outOfStock}
                 />
@@ -498,9 +531,7 @@ function ProductView({ product, related }) {
                     aria-label={
                       outOfStock
                         ? `${product.name} is out of stock`
-                        : inCart
-                          ? 'Go to cart'
-                          : `Add ${quantity} ${product.name} to cart`
+                        : `Add ${product.name} to cart`
                     }
                   >
                     {addLabel}
@@ -634,9 +665,9 @@ function ProductView({ product, related }) {
                   ? 'Go to cart'
                   : `Add ${quantity} ${product.name} to cart`
             }
-            onClick={handleAdd}
+            onClick={handleStickyAdd}
           >
-            {addLabel}
+            {stickyAddLabel}
           </button>
         </div>
       </div>

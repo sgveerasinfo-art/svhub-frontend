@@ -8,14 +8,15 @@ import { getFeaturedProducts } from '../api/products.js'
 import { getStorefront } from '../data/storefronts.js'
 import { formatPrice } from '../utils/money.js'
 import { handleProductImageError, resolveDisplayProductImage } from '../utils/productImage.js'
+import { lineKey as cartLineKey, maxAllowedForProduct } from '../utils/cartLine.js'
 import CartRemoveModal from '../components/cart/CartRemoveModal.jsx'
 import CartLoginModal from '../components/cart/CartLoginModal.jsx'
 import './CartPage.css'
 
-const MAX_QTY = 12
+const SOFT_MAX = 12
 
 function lineKey(item) {
-  return item.itemId || `${item.id || item.productId}::${item.weight ?? ''}`
+  return item.itemId || cartLineKey(item)
 }
 
 function houseClass(storefront) {
@@ -140,13 +141,14 @@ function IconArrow() {
   )
 }
 
-function QuantityPill({ item, quantity, onChange }) {
+function QuantityPill({ item, quantity, onAdjust }) {
+  const maxQty = Math.min(SOFT_MAX, maxAllowedForProduct(item, item))
   return (
     <div className="cart-qty" role="group" aria-label={`Quantity of ${item.name}`}>
       <button
         type="button"
         className="cart-qty__btn"
-        onClick={() => onChange(quantity - 1)}
+        onClick={() => onAdjust(-1)}
         disabled={quantity <= 1}
         aria-label={`Decrease quantity of ${item.name}`}
       >
@@ -158,8 +160,8 @@ function QuantityPill({ item, quantity, onChange }) {
       <button
         type="button"
         className="cart-qty__btn"
-        onClick={() => onChange(quantity + 1)}
-        disabled={quantity >= MAX_QTY}
+        onClick={() => onAdjust(1)}
+        disabled={quantity >= maxQty}
         aria-label={`Increase quantity of ${item.name}`}
       >
         <IconPlus />
@@ -168,7 +170,7 @@ function QuantityPill({ item, quantity, onChange }) {
   )
 }
 
-function CartLine({ item, onQuantity, onRemove }) {
+function CartLine({ item, onAdjust, onRemove }) {
   const house = getStorefront(item.storefront)
   const lineTotal = item.price * item.quantity
   const compareTotal =
@@ -200,7 +202,7 @@ function CartLine({ item, onQuantity, onRemove }) {
         </div>
 
         <div className="cart-line__bottom">
-          <QuantityPill item={item} quantity={item.quantity} onChange={onQuantity} />
+          <QuantityPill item={item} quantity={item.quantity} onAdjust={onAdjust} />
           <div className="cart-line__price">
             <span className="cart-line__total">{formatPrice(lineTotal)}</span>
             {compareTotal ? <s className="cart-line__compare">{formatPrice(compareTotal)}</s> : null}
@@ -254,16 +256,13 @@ function RelatedCard({ product, onAdd }) {
 }
 
 function CartPage() {
-  const { items, count, addItem, setItemQuantity } = useCart()
+  const { items, count, subtotal: cartSubtotal, addItem, setItemQuantity, adjustItemQuantity, cartError, clearCartError } = useCart()
   const { user } = useAuth()
   const navigate = useNavigate()
   const [promo, setPromo] = useState('')
   const [itemPendingRemoval, setItemPendingRemoval] = useState(null)
   const [showLoginModal, setShowLoginModal] = useState(false)
-  const subtotal = useMemo(
-    () => items.reduce((sum, item) => sum + item.price * item.quantity, 0),
-    [items],
-  )
+  const subtotal = cartSubtotal
   const [featuredList, setFeaturedList] = useState([])
 
   function handleProceedToCheckout() {
@@ -315,6 +314,15 @@ function CartPage() {
           <h1 className="cart-page__title">Goodness Worth Bringing Home.</h1>
         </header>
 
+        {cartError ? (
+          <div className="cart-page__error" role="alert">
+            <p>{cartError}</p>
+            <button type="button" className="cart-page__error-dismiss" onClick={clearCartError}>
+              Dismiss
+            </button>
+          </div>
+        ) : null}
+
         {items.length === 0 ? (
           <div className="cart-empty">
             <IconBag />
@@ -331,7 +339,7 @@ function CartPage() {
                 <CartLine
                   key={lineKey(item)}
                   item={item}
-                  onQuantity={(qty) => setItemQuantity(item, qty)}
+                  onAdjust={(delta) => adjustItemQuantity(item, delta)}
                   onRemove={() => setItemPendingRemoval(item)}
                 />
               ))}

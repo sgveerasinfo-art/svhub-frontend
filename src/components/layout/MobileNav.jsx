@@ -1,7 +1,12 @@
 import { useEffect, useRef } from 'react'
-import { NavLink, Link } from 'react-router-dom'
+import { NavLink } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext.jsx'
 import Logo from '../brand/Logo.jsx'
+import {
+  homeLink,
+  primaryDestinations,
+  secondaryLinks,
+} from '../../data/navigation.js'
 import './MobileNav.css'
 
 function CloseIcon() {
@@ -12,13 +17,14 @@ function CloseIcon() {
   )
 }
 
-function MobileNav({ open, onClose, links }) {
+function MobileNav({ open, onClose }) {
   const { user } = useAuth()
   const closeRef = useRef(null)
   const panelRef = useRef(null)
 
-  const navLinks = [
-    ...links,
+  const moreLinks = [
+    homeLink,
+    ...secondaryLinks,
     {
       to: '/account',
       label: user ? 'Account' : 'Account / Login',
@@ -57,7 +63,13 @@ function MobileNav({ open, onClose, links }) {
 
   return (
     <div className={`mobile-nav${open ? ' is-open' : ''}`} id="mobile-nav">
-      <button type="button" className="mobile-nav__backdrop" onClick={onClose} tabIndex={open ? 0 : -1} aria-label="Close menu" />
+      <button
+        type="button"
+        className="mobile-nav__backdrop"
+        onClick={onClose}
+        tabIndex={open ? 0 : -1}
+        aria-label="Close menu"
+      />
       <aside
         ref={panelRef}
         className="mobile-nav__panel"
@@ -69,28 +81,61 @@ function MobileNav({ open, onClose, links }) {
           <span onClick={onClose}>
             <Logo />
           </span>
-          <button ref={closeRef} type="button" className="mobile-nav__close" onClick={onClose} aria-label="Close menu">
+          <button
+            ref={closeRef}
+            type="button"
+            className="mobile-nav__close"
+            onClick={onClose}
+            aria-label="Close menu"
+          >
             <CloseIcon />
           </button>
         </div>
 
-        <p className="mobile-nav__eyebrow">Explore SV Hub</p>
+        <nav className="mobile-nav__nav" aria-label="Mobile">
+          <p className="mobile-nav__section-label" id="mobile-nav-primary-label">
+            Primary
+          </p>
+          <div
+            className="mobile-nav__primary"
+            role="group"
+            aria-labelledby="mobile-nav-primary-label"
+          >
+            {primaryDestinations.map((link) => (
+              <NavLink
+                key={link.to}
+                to={link.to}
+                className={({ isActive }) =>
+                  `mobile-nav__dest${isActive ? ' mobile-nav__dest--active' : ''}`
+                }
+                onClick={onClose}
+              >
+                <span>{link.label}</span>
+                <span className="mobile-nav__dest-arrow" aria-hidden="true">
+                  →
+                </span>
+              </NavLink>
+            ))}
+          </div>
 
-        <nav className="mobile-nav__links" aria-label="Mobile">
-          {navLinks.map((link, index) => (
-            <NavLink
-              key={link.to}
-              to={link.to}
-              end={link.to === '/'}
-              className={({ isActive }) =>
-                `mobile-nav__link${isActive ? ' mobile-nav__link--active' : ''}`
-              }
-              onClick={onClose}
-            >
-              <span className="mobile-nav__index">{String(index + 1).padStart(2, '0')}</span>
-              <span className="mobile-nav__label">{link.label}</span>
-            </NavLink>
-          ))}
+          <p className="mobile-nav__section-label" id="mobile-nav-more-label">
+            More
+          </p>
+          <div className="mobile-nav__links" role="group" aria-labelledby="mobile-nav-more-label">
+            {moreLinks.map((link) => (
+              <NavLink
+                key={link.to}
+                to={link.to}
+                end={link.end || link.to === '/'}
+                className={({ isActive }) =>
+                  `mobile-nav__link${isActive ? ' mobile-nav__link--active' : ''}`
+                }
+                onClick={onClose}
+              >
+                <span className="mobile-nav__label">{link.label}</span>
+              </NavLink>
+            ))}
+          </div>
         </nav>
       </aside>
     </div>

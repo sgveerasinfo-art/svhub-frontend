@@ -5,30 +5,16 @@ import '../../components/auth/Auth.css'
 import Button from '../../components/ui/Button.jsx'
 import { contact } from '../../data/contact.js'
 import { images } from '../../data/images.js'
-import { emailError, nameError, phoneError } from '../../utils/authValidation.js'
+import {
+  contactEmailError,
+  contactMessageError,
+  contactNameError,
+  contactPhoneError,
+  mailHref,
+  validateContactForm,
+  whatsappHref,
+} from '../../utils/contactComposer.js'
 import './Contact.css'
-
-function messageError(value = '') {
-  const message = value.trim()
-  if (!message) return 'Tell us how we can help.'
-  if (message.length < 10) return 'A few more words will help us reply well.'
-  return ''
-}
-
-function mailHref(form) {
-  const subject = encodeURIComponent(`A note from ${form.name.trim()}`)
-  const body = encodeURIComponent(
-    `${form.message.trim()}\n\n— ${form.name.trim()}\n${form.email.trim()}\n${form.phone.trim()}`,
-  )
-  return `mailto:${contact.email}?subject=${subject}&body=${body}`
-}
-
-function whatsappHref(form) {
-  const text = encodeURIComponent(
-    `Hello SV Hub,\n\n${form.message.trim()}\n\n— ${form.name.trim()}\n${form.email.trim()}\n${form.phone.trim()}`,
-  )
-  return `${contact.whatsappUrl}?text=${text}`
-}
 
 function WhatsAppMark() {
   return (
@@ -41,6 +27,21 @@ function WhatsAppMark() {
       <path
         d="M9.3 8.7c.18-.4.36-.42.53-.43h.45c.18 0 .42 0 .63.3.22.32.74 1.02.8 1.1.07.07.12.18.02.35-.1.18-.14.28-.28.43-.14.15-.3.33-.13.63.16.3.73 1.2 1.57 1.95 1.08.96 1.98 1.26 2.28 1.4.3.15.47.12.65-.07.17-.18.74-.86.94-1.16.2-.3.4-.24.66-.14.27.1 1.7.8 1.99.95.3.14.49.22.56.34.07.13.07.73-.17 1.44-.24.7-1.4 1.37-1.94 1.42-.54.05-1.22.08-3.53-.87-2.78-1.15-4.56-3.96-4.7-4.15-.13-.18-1.1-1.46-1.1-2.78 0-1.32.7-1.97.94-2.24Z"
         fill="currentColor"
+      />
+    </svg>
+  )
+}
+
+function EmailMark() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <rect x="3.25" y="5.25" width="17.5" height="13.5" rx="1.75" stroke="currentColor" strokeWidth="1.6" />
+      <path
+        d="M4 7.5 12 13l8-5.5"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
       />
     </svg>
   )
@@ -61,47 +62,67 @@ function Contact() {
   const [form, setForm] = useState({ name: '', email: '', phone: '', message: '' })
   const [touched, setTouched] = useState({})
   const [busy, setBusy] = useState(false)
-  const [success, setSuccess] = useState(false)
+  const [openedChannel, setOpenedChannel] = useState('')
 
   useEffect(() => {
     window.scrollTo(0, 0)
   }, [])
 
   const errors = {
-    name: touched.name ? nameError(form.name) : '',
-    email: touched.email ? emailError(form.email) : '',
-    phone: touched.phone ? phoneError(form.phone) : '',
-    message: touched.message ? messageError(form.message) : '',
+    name: touched.name ? contactNameError(form.name) : '',
+    email: touched.email ? contactEmailError(form.email) : '',
+    phone: touched.phone ? contactPhoneError(form.phone) : '',
+    message: touched.message ? contactMessageError(form.message) : '',
   }
 
   function setField(key, value) {
     setForm((current) => ({ ...current, [key]: value }))
-    setSuccess(false)
+    setOpenedChannel('')
   }
 
-  function handleSubmit(event) {
-    event.preventDefault()
-    const nextErrors = {
-      name: nameError(form.name),
-      email: emailError(form.email),
-      phone: phoneError(form.phone),
-      message: messageError(form.message),
-    }
+  function validateAndFocus() {
+    const nextErrors = validateContactForm(form)
     setTouched({ name: true, email: true, phone: true, message: true })
 
     if (Object.values(nextErrors).some(Boolean)) {
       window.requestAnimationFrame(() => {
+        formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
         document.getElementById(firstErrorId(nextErrors))?.focus()
       })
-      return
+      return false
     }
 
+    return true
+  }
+
+  function handleWhatsApp(event) {
+    event.preventDefault()
+    if (!validateAndFocus()) return
+
+    const href = whatsappHref(form)
     setBusy(true)
-    window.location.href = mailHref(form)
-    window.setTimeout(() => {
-      setBusy(false)
-      setSuccess(true)
-    }, 400)
+    setOpenedChannel('whatsapp')
+    window.open(href, '_blank', 'noopener,noreferrer')
+    window.setTimeout(() => setBusy(false), 400)
+  }
+
+  function handleEmail(event) {
+    event.preventDefault()
+    if (!validateAndFocus()) return
+
+    const href = mailHref(form)
+    setBusy(true)
+    setOpenedChannel('email')
+    window.location.href = href
+    window.setTimeout(() => setBusy(false), 400)
+  }
+
+  function scrollToForm(event) {
+    event.preventDefault()
+    formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    window.requestAnimationFrame(() => {
+      document.getElementById('contact-name')?.focus()
+    })
   }
 
   return (
@@ -151,26 +172,34 @@ function Contact() {
             </ul>
 
             <div className="contact-reach__actions">
-              <Button href={contact.whatsappUrl} variant="primary" size="md" arrow target="_blank" rel="noreferrer">
+              <Button type="button" variant="primary" size="md" arrow onClick={handleWhatsApp} disabled={busy}>
                 <WhatsAppMark />
                 Chat on WhatsApp
               </Button>
-              <Button href={`mailto:${contact.email}`} variant="secondary" size="md">
+              <Button type="button" variant="secondary" size="md" onClick={scrollToForm}>
                 Write to us
               </Button>
             </div>
           </aside>
 
-          <form ref={formRef} className="contact-form" onSubmit={handleSubmit} noValidate>
+          <form ref={formRef} className="contact-form" onSubmit={handleEmail} noValidate>
             <p className="contact-kicker">Write to us</p>
             <h2>Send a message</h2>
             <p className="contact-form__lede">
-              Leave your details and a few words. We’ll reply from {contact.email}.
+              Leave your details and a few words. We’ll open WhatsApp or your email app so you can review before sending.
+              We reply from {contact.email}.
             </p>
 
-            {success ? (
+            {openedChannel === 'email' ? (
               <AuthAlert tone="success">
-                Your note is ready in your mail app. If it didn’t open, write to {contact.email} or chat on WhatsApp.
+                Your note is ready in your mail app. Review it, then send when you’re ready. Prefer WhatsApp? Use Chat on
+                WhatsApp with the same details.
+              </AuthAlert>
+            ) : null}
+
+            {openedChannel === 'whatsapp' ? (
+              <AuthAlert tone="success">
+                WhatsApp is open with your message ready. Review it, then send when you’re ready.
               </AuthAlert>
             ) : null}
 
@@ -232,14 +261,22 @@ function Contact() {
             </div>
 
             <div className="contact-form__cta">
-              <Button type="submit" variant="espresso" size="md" arrow disabled={busy} aria-busy={busy}>
-                {busy ? 'Opening' : 'Send message'}
+              <Button
+                type="button"
+                variant="primary"
+                size="md"
+                arrow
+                disabled={busy}
+                aria-busy={busy}
+                onClick={handleWhatsApp}
+              >
+                <WhatsAppMark />
+                Chat on WhatsApp
               </Button>
-              {success ? (
-                <a className="contact-form__wa" href={whatsappHref(form)} target="_blank" rel="noreferrer">
-                  Send this on WhatsApp →
-                </a>
-              ) : null}
+              <Button type="submit" variant="espresso" size="md" arrow disabled={busy} aria-busy={busy}>
+                <EmailMark />
+                {busy && openedChannel === 'email' ? 'Opening' : 'Send via Email'}
+              </Button>
             </div>
           </form>
         </div>

@@ -26,6 +26,30 @@
   pointer-events: auto;
 }
 
+.sticky-cart-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 12px 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #f8e8e4;
+  color: #9b2c1a;
+  font-size: 13px;
+  line-height: 1.4;
+  pointer-events: auto;
+}
+
+.sticky-cart-error button {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
 /* Mobile Bar Base (Docked) */
 .sticky-cart-bar {
   display: flex;

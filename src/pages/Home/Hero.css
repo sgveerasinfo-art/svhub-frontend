@@ -96,6 +96,42 @@
   background: #162116;
 }
 
+.hero__destinations {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px 20px;
+  margin-top: 18px;
+}
+
+.hero__destination {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--charcoal-green);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  opacity: 0.72;
+  transition:
+    opacity 280ms ease,
+    color 280ms ease;
+}
+
+.hero__destination:hover,
+.hero__destination:focus-visible {
+  color: var(--espresso-brown);
+  opacity: 1;
+}
+
+.hero__destination:focus-visible {
+  outline: 2px solid var(--sv-green);
+  outline-offset: 4px;
+  border-radius: 4px;
+}
+
 .hero__star {
   position: absolute;
   color: #1f2e1f;
@@ -173,6 +209,15 @@
 
   .hero__button {
     width: min(100%, 280px);
+  }
+
+  .hero__destinations {
+    margin-top: 16px;
+    gap: 6px 16px;
+  }
+
+  .hero__destination {
+    font-size: 12px;
   }
 
   .hero__image {

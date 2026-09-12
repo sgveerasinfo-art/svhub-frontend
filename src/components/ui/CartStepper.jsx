@@ -1,7 +1,8 @@
 import { useCart } from '../../context/CartContext.jsx'
+import { findCartLine, maxAllowedForProduct } from '../../utils/cartLine.js'
 import './CartStepper.css'
 
-const MAX_QTY = 12
+const SOFT_MAX = 12
 
 function PlusIcon() {
   return (
@@ -12,9 +13,12 @@ function PlusIcon() {
 }
 
 function CartStepper({ product, className = '' }) {
-  const { addItem, setItemQuantity, quantityOf } = useCart()
+  const { addItem, adjustItemQuantity, quantityOf, items } = useCart()
   const qty = quantityOf(product)
-  const outOfStock = product.stock === 'out-of-stock'
+  const line = findCartLine(items, product)
+  const stockMax = maxAllowedForProduct(product, line)
+  const maxQty = Math.min(SOFT_MAX, stockMax)
+  const outOfStock = product.stock === 'out-of-stock' || maxQty <= 0
   const classes = `cart-step${className ? ` ${className}` : ''}`
 
   if (outOfStock) {
@@ -43,7 +47,7 @@ function CartStepper({ product, className = '' }) {
       <button
         type="button"
         className="cart-step__btn"
-        onClick={() => setItemQuantity(product, qty - 1)}
+        onClick={() => adjustItemQuantity(product, -1)}
         aria-label={`Remove one ${product.name}`}
       >
         −
@@ -54,8 +58,8 @@ function CartStepper({ product, className = '' }) {
       <button
         type="button"
         className="cart-step__btn"
-        disabled={qty >= MAX_QTY}
-        onClick={() => setItemQuantity(product, qty + 1)}
+        disabled={qty >= maxQty}
+        onClick={() => adjustItemQuantity(product, 1)}
         aria-label={`Add another ${product.name}`}
       >
         +

@@ -4,6 +4,7 @@ function QuantitySelector({
   id = 'quantity',
   value,
   onChange,
+  onAdjust,
   min = 1,
   max = 12,
   disabled = false,
@@ -11,9 +12,17 @@ function QuantitySelector({
   const atMin = value <= min
   const atMax = value >= max
 
-  function set(next) {
+  function setAbsolute(next) {
     const clamped = Math.min(max, Math.max(min, next))
     onChange(clamped)
+  }
+
+  function bump(delta) {
+    if (typeof onAdjust === 'function') {
+      onAdjust(delta)
+      return
+    }
+    setAbsolute(value + delta)
   }
 
   return (
@@ -25,7 +34,7 @@ function QuantitySelector({
         <button
           type="button"
           className="qty__btn"
-          onClick={() => set(value - 1)}
+          onClick={() => bump(-1)}
           disabled={disabled || atMin}
           aria-label="Decrease quantity"
         >
@@ -45,13 +54,13 @@ function QuantitySelector({
               onChange(min)
               return
             }
-            set(next)
+            setAbsolute(next)
           }}
         />
         <button
           type="button"
           className="qty__btn"
-          onClick={() => set(value + 1)}
+          onClick={() => bump(1)}
           disabled={disabled || atMax}
           aria-label="Increase quantity"
         >

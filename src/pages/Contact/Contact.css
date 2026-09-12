@@ -195,21 +195,12 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 12px 20px;
+  gap: 12px 16px;
   margin-top: 32px;
 }
 
-.contact-form__wa {
-  color: var(--leaf-green);
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-
-.contact-form__wa:hover {
-  color: var(--espresso-brown);
-  text-decoration: underline;
+.contact-form__cta .btn {
+  min-width: min(100%, 220px);
 }
 
 .contact-map {
@@ -345,8 +336,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .contact-facts a,
-  .contact-form__wa {
+  .contact-facts a {
     transition: none;
   }
 }

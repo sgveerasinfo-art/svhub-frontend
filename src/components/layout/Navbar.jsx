@@ -3,16 +3,12 @@ import { useEffect, useRef, useState } from 'react'
 import Logo from '../brand/Logo.jsx'
 import MobileNav from './MobileNav.jsx'
 import { useCart } from '../../context/CartContext.jsx'
+import {
+  homeLink,
+  primaryDestinations,
+  secondaryLinks,
+} from '../../data/navigation.js'
 import './Navbar.css'
-
-const links = [
-  { to: '/', label: 'Home' },
-  { to: '/shop', label: 'Shop' },
-  { to: '/nutri-hub', label: 'Nutri-Hub' },
-  { to: '/self-care', label: 'Self-Care' },
-  { to: '/about', label: 'About' },
-  { to: '/contact', label: 'Contact' },
-]
 
 function IconSearch() {
   return (
@@ -50,6 +46,26 @@ function IconCart() {
       <circle cx="9" cy="21" r="1.15" fill="currentColor" />
       <circle cx="17" cy="21" r="1.15" fill="currentColor" />
     </svg>
+  )
+}
+
+function NavItem({ to, label, end = false, primary = false }) {
+  return (
+    <NavLink
+      to={to}
+      end={end}
+      className={({ isActive }) =>
+        [
+          'navbar__link',
+          primary ? 'navbar__link--primary' : '',
+          isActive ? 'navbar__link--active' : '',
+        ]
+          .filter(Boolean)
+          .join(' ')
+      }
+    >
+      {label}
+    </NavLink>
   )
 }
 
@@ -111,17 +127,16 @@ function Navbar() {
         <Logo />
 
         <nav className="navbar__links" aria-label="Primary">
-          {links.map((link) => (
-            <NavLink
-              key={link.to}
-              to={link.to}
-              end={link.to === '/'}
-              className={({ isActive }) =>
-                `navbar__link${isActive ? ' navbar__link--active' : ''}`
-              }
-            >
-              {link.label}
-            </NavLink>
+          <NavItem to={homeLink.to} label={homeLink.label} end />
+
+          <div className="navbar__primary" role="group" aria-label="Shop destinations">
+            {primaryDestinations.map((link) => (
+              <NavItem key={link.to} to={link.to} label={link.label} primary />
+            ))}
+          </div>
+
+          {secondaryLinks.map((link) => (
+            <NavItem key={link.to} to={link.to} label={link.label} />
           ))}
         </nav>
 
@@ -161,12 +176,7 @@ function Navbar() {
         </div>
       </div>
 
-      <MobileNav
-        open={menuOpen}
-        onClose={() => setMenuOpen(false)}
-        links={links}
-        cartCount={count}
-      />
+      <MobileNav open={menuOpen} onClose={() => setMenuOpen(false)} />
     </header>
   )
 }

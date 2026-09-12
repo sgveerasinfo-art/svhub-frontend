@@ -35,7 +35,7 @@ function ArrowRight() {
 }
 
 export default function StickyCartBar() {
-  const { count, subtotal } = useCart()
+  const { count, subtotal, cartError, clearCartError } = useCart()
   const [isExiting, setIsExiting] = useState(false)
   const [isVisible, setIsVisible] = useState(count > 0)
   const [pulse, setPulse] = useState(false)
@@ -86,6 +86,14 @@ export default function StickyCartBar() {
       className={`sticky-cart-container ${isVisible ? 'is-visible' : ''}`}
       aria-label="Cart summary bar"
     >
+      {cartError ? (
+        <div className="sticky-cart-error" role="alert">
+          <span>{cartError}</span>
+          <button type="button" onClick={clearCartError} aria-label="Dismiss cart error">
+            ×
+          </button>
+        </div>
+      ) : null}
       <Link
         to="/cart"
         className="sticky-cart-bar"

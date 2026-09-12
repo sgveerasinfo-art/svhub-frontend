@@ -2,20 +2,18 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import * as cartApi from '../api/cart.js'
 import { readToken } from '../api/client.js'
 import { useAuth } from './AuthContext.jsx'
+import {
+  applyLocalAdd,
+  applyLocalQuantity,
+  computeCartSubtotal,
+  createQuantitySyncQueue,
+  findCartLine,
+  lineKey,
+  maxAllowedForProduct,
+  resolveVariantId,
+} from '../utils/cartLine.js'
 
 const CartContext = createContext(null)
-
-// ─── Shape helpers ─────────────────────────────────────────────────────────────
-// Backend cart items have: itemId, productId, slug, name, type, category, storefront,
-// variantId, variantLabel, weight, sku, image, price, originalPrice, discount,
-// quantity, lineTotal, stock, availableStock, inStock, maxAllowed
-
-function lineKey(item) {
-  if (!item) return ''
-  const prodId = item.productId || item.id || item._id || ''
-  const vId = item.variantId || item.weight || ''
-  return `${prodId}::${vId}`
-}
 
 function cartFromBackend(data) {
   if (!data) return { items: [], count: 0, subtotal: 0 }
@@ -50,29 +48,51 @@ function writeGuestCart(cartItems) {
   }
 }
 
-// ─── Provider ──────────────────────────────────────────────────────────────────
+function friendlyCartError(error) {
+  if (!error) return 'Could not update your cart. Please try again.'
+  if (error.code === 'insufficient_stock') return error.message || 'Not enough stock available.'
+  if (error.code === 'quantity_limit_exceeded') return error.message || 'Maximum quantity reached.'
+  if (error.code === 'unauthenticated' || error.code === 'token_expired' || error.status === 401) {
+    return 'Please log in again to update your cart.'
+  }
+  if (error.code === 'network') return error.message || 'Could not reach SV Hub. Check your connection.'
+  return error.message || 'Could not update your cart. Please try again.'
+}
+
 export function CartProvider({ children }) {
   const { user } = useAuth()
   const prevUserRef = useRef(user)
+  const itemsRef = useRef([])
+  const pendingAddsRef = useRef(new Map())
+  const syncingRef = useRef(false)
+  const qtyQueueRef = useRef(null)
+
   const [items, setItems] = useState(() => {
-    if (!readToken()) {
-      return readGuestCart()
-    }
+    if (!readToken()) return readGuestCart()
     return []
   })
   const [subtotal, setSubtotal] = useState(0)
   const [loading, setLoading] = useState(() => Boolean(readToken() && user))
-  const syncingRef = useRef(false)
+  const [cartError, setCartError] = useState('')
+
+  itemsRef.current = items
 
   const isLoggedIn = useCallback(() => Boolean(readToken() && user), [user])
 
-  function applyServerCart(res) {
+  const applyServerCart = useCallback((res) => {
     const { items: backendItems, subtotal: total } = cartFromBackend(res?.data)
+    itemsRef.current = backendItems
     setItems(backendItems)
     setSubtotal(total)
-  }
+  }, [])
 
-  // ── Sync from backend ───────────────────────────────────────────────────────
+  const applyOptimisticItems = useCallback((nextItems) => {
+    const normalized = nextItems || []
+    itemsRef.current = normalized
+    setItems(normalized)
+    setSubtotal(computeCartSubtotal(normalized))
+  }, [])
+
   const syncCart = useCallback(async () => {
     if (!readToken() || !user || syncingRef.current) return
     syncingRef.current = true
@@ -81,246 +101,299 @@ export function CartProvider({ children }) {
       const res = await cartApi.getCart()
       applyServerCart(res)
     } catch {
-      // Silent — keep existing cart state
+      // Keep existing cart state
     } finally {
       setLoading(false)
       syncingRef.current = false
     }
-  }, [user])
+  }, [user, applyServerCart])
 
-  // ── Merge guest cart on login ────────────────────────────────────────────────
-  const mergeGuestCart = useCallback(async (guestItems) => {
-    const itemsToMerge = guestItems?.length ? guestItems : readGuestCart()
-    if (!itemsToMerge?.length) {
-      await syncCart()
-      return
-    }
+  if (!qtyQueueRef.current) {
+    qtyQueueRef.current = createQuantitySyncQueue({
+      update: (itemId, quantity) => cartApi.updateCartItem(itemId, quantity),
+      remove: (itemId) => cartApi.removeCartItem(itemId),
+      onSuccess: (res) => {
+        // Preserve newer optimistic quantities for lines still pending sync.
+        const queue = qtyQueueRef.current
+        const { items: backendItems, subtotal: total } = cartFromBackend(res?.data)
+        if (!queue || queue.pendingCount() === 0) {
+          itemsRef.current = backendItems
+          setItems(backendItems)
+          setSubtotal(total)
+          setCartError('')
+          return
+        }
 
-    const mappable = itemsToMerge
-      .map((item) => ({
-        productId: item.productId || item.id,
-        variantId: item.variantId || (item.weight ? item.weight.replace(/\s+/g, '').toLowerCase() : '500g'),
-        quantity: item.quantity || 1,
-      }))
-      .filter((item) => item.productId && item.variantId)
+        const merged = backendItems.map((item) => {
+          const key = lineKey(item)
+          if (queue.hasPending(key)) {
+            const local = findCartLine(itemsRef.current, item)
+            if (local) return { ...item, quantity: local.quantity, lineTotal: (Number(item.price) || 0) * local.quantity }
+          }
+          return item
+        })
+        itemsRef.current = merged
+        setItems(merged)
+        setSubtotal(computeCartSubtotal(merged))
+        setCartError('')
+      },
+      onError: async (error) => {
+        setCartError(friendlyCartError(error))
+        try {
+          const res = await cartApi.getCart()
+          applyServerCart(res)
+        } catch {
+          // Keep optimistic state if refresh also fails; error is already shown.
+        }
+      },
+    })
+  }
 
-    if (!mappable.length) {
-      writeGuestCart([])
-      await syncCart()
-      return
-    }
+  const mergeGuestCart = useCallback(
+    async (guestItems) => {
+      const itemsToMerge = guestItems?.length ? guestItems : readGuestCart()
+      if (!itemsToMerge?.length) {
+        await syncCart()
+        return
+      }
 
-    try {
-      const res = await cartApi.mergeCart(mappable)
-      writeGuestCart([])
-      applyServerCart(res)
-    } catch {
-      writeGuestCart([])
-      await syncCart()
-    }
-  }, [syncCart])
+      const mappable = itemsToMerge
+        .map((item) => ({
+          productId: item.productId || item.id,
+          variantId: item.variantId || resolveVariantId(item) || '500g',
+          quantity: item.quantity || 1,
+        }))
+        .filter((item) => item.productId && item.variantId)
 
-  // ── Handle user login / logout / init ────────────────────────────────────────
+      if (!mappable.length) {
+        writeGuestCart([])
+        await syncCart()
+        return
+      }
+
+      try {
+        const res = await cartApi.mergeCart(mappable)
+        writeGuestCart([])
+        applyServerCart(res)
+      } catch {
+        writeGuestCart([])
+        await syncCart()
+      }
+    },
+    [syncCart, applyServerCart],
+  )
+
   useEffect(() => {
     const prevUser = prevUserRef.current
     prevUserRef.current = user
 
     if (!prevUser && user) {
-      // User logged in: merge in-memory and stored guest items if any
-      setItems((currentItems) => {
-        const guestItems = currentItems.filter((it) => !it.itemId)
-        const stored = readGuestCart()
-        const combined = guestItems.length > 0 ? guestItems : stored
-        if (combined.length > 0) {
-          mergeGuestCart(combined)
-        } else {
-          syncCart()
-        }
-        return currentItems
-      })
+      const guestItems = itemsRef.current.filter((it) => !it.itemId)
+      const stored = readGuestCart()
+      const combined = guestItems.length > 0 ? guestItems : stored
+      if (combined.length > 0) {
+        mergeGuestCart(combined)
+      } else {
+        syncCart()
+      }
     } else if (prevUser && !user) {
-      // User logged out: clear cart state for strict isolation
+      qtyQueueRef.current?.clear()
+      pendingAddsRef.current.clear()
       writeGuestCart([])
+      itemsRef.current = []
       setItems([])
       setSubtotal(0)
+      setCartError('')
     } else if (user) {
       syncCart()
     }
   }, [user, mergeGuestCart, syncCart])
 
-  // ── Computed ────────────────────────────────────────────────────────────────
-  const count = useMemo(
-    () => items.reduce((total, item) => total + item.quantity, 0),
-    [items],
-  )
+  const count = useMemo(() => items.reduce((total, item) => total + (Number(item.quantity) || 0), 0), [items])
 
   const effectiveSubtotal = useMemo(() => {
     if (isLoggedIn()) return subtotal
-    return items.reduce(
-      (total, item) => total + (item.lineTotal ?? (Number(item.price) || 0) * (Number(item.quantity) || 1)),
-      0,
-    )
+    return computeCartSubtotal(items)
   }, [isLoggedIn, subtotal, items])
 
-  // ── Add item ────────────────────────────────────────────────────────────────
-  const addItem = useCallback(async (product, quantity = 1) => {
-    const qty = Math.max(1, Number(quantity) || 1)
+  const clearCartError = useCallback(() => setCartError(''), [])
 
-    if (!isLoggedIn()) {
-      // Guest: in-memory + localStorage
-      setItems((current) => {
-        const key = lineKey(product)
-        const existing = current.find((item) => lineKey(item) === key)
-        let updated
-        if (existing) {
-          updated = current.map((item) =>
-            lineKey(item) === key ? { ...item, quantity: item.quantity + qty } : item,
-          )
-        } else {
-          updated = [...current, { ...product, quantity: qty }]
-        }
+  const addItem = useCallback(
+    async (product, quantity = 1) => {
+      const qty = Math.max(1, Number(quantity) || 1)
+      const variantId = product.variantId || resolveVariantId(product)
+      const productId = product.productId || product.id || product._id
+      const key = lineKey({ ...product, productId, variantId })
+      setCartError('')
+
+      if (!isLoggedIn()) {
+        const updated = applyLocalAdd(itemsRef.current, { ...product, productId, variantId }, qty)
+        itemsRef.current = updated
         writeGuestCart(updated)
-        return updated
-      })
-      return
-    }
+        setItems(updated)
+        return
+      }
 
-    // Logged in: need productId + variantId
-    const productId = product.productId || product.id
+      if (!productId || !variantId) return
 
-    // Find variantId: prefer explicit, else pick first available variant from product.variants
-    let variantId = product.variantId
-    if (!variantId && Array.isArray(product.variants) && product.variants.length > 0) {
-      const firstAvail = product.variants.find((v) => v.stock !== 'out-of-stock') ?? product.variants[0]
-      variantId = firstAvail.variantId ?? firstAvail.id
-    }
-    if (!variantId) {
-      // Last fallback: derive from weight
-      variantId = (product.weight ?? '500g').replace(/\s+/g, '').toLowerCase()
-    }
+      const snapshot = itemsRef.current
+      applyOptimisticItems(applyLocalAdd(snapshot, { ...product, productId, variantId }, qty))
 
-    if (!productId || !variantId) return
-
-    try {
-      const res = await cartApi.addToCart({ productId, variantId, quantity: qty })
-      applyServerCart(res)
-    } catch (err) {
-      console.warn('Backend cart add failed, falling back to local item:', err.message)
-      setItems((current) => {
-        const key = lineKey(product)
-        const existing = current.find((item) => lineKey(item) === key)
-        let updated
-        if (existing) {
-          updated = current.map((item) =>
-            lineKey(item) === key ? { ...item, quantity: item.quantity + qty } : item,
-          )
-        } else {
-          updated = [...current, { ...product, quantity: qty }]
-        }
-        return updated
-      })
-    }
-  }, [isLoggedIn])
-
-  // ── Set quantity ─────────────────────────────────────────────────────────────
-  const setItemQuantity = useCallback(async (product, quantity) => {
-    const qty = Math.max(0, Number(quantity) || 0)
-
-    if (!isLoggedIn()) {
-      // Guest: in-memory + localStorage
-      setItems((current) => {
-        const prodId = product.productId || product.id || product._id
-        const key = lineKey(product)
-        let updated
-        if (qty === 0) {
-          updated = current.filter((item) => {
-            const itemProdId = item.productId || item.id || item._id
-            return lineKey(item) !== key && itemProdId !== prodId
-          })
-        } else {
-          const existing = current.find(
-            (item) => lineKey(item) === key || (item.productId || item.id || item._id) === prodId
-          )
-          if (existing) {
-            const matchKey = lineKey(existing)
-            updated = current.map((item) => (lineKey(item) === matchKey ? { ...item, quantity: qty } : item))
+      const addPromise = (async () => {
+        try {
+          const res = await cartApi.addToCart({ productId, variantId, quantity: qty })
+          const queue = qtyQueueRef.current
+          if (queue && queue.pendingCount() > 0) {
+            const { items: backendItems } = cartFromBackend(res?.data)
+            const merged = backendItems.map((item) => {
+              const line = lineKey(item)
+              if (queue.hasPending(line)) {
+                const local = findCartLine(itemsRef.current, item)
+                if (local) {
+                  return {
+                    ...item,
+                    quantity: local.quantity,
+                    lineTotal: (Number(item.price) || 0) * local.quantity,
+                  }
+                }
+              }
+              return item
+            })
+            itemsRef.current = merged
+            setItems(merged)
+            setSubtotal(computeCartSubtotal(merged))
           } else {
-            updated = [...current, { ...product, quantity: qty }]
+            applyServerCart(res)
+          }
+          const matched = findCartLine(cartFromBackend(res?.data).items, {
+            productId,
+            variantId,
+          })
+          return matched?.itemId || null
+        } catch (error) {
+          setCartError(friendlyCartError(error))
+          applyOptimisticItems(snapshot)
+          throw error
+        } finally {
+          pendingAddsRef.current.delete(key)
+        }
+      })()
+
+      pendingAddsRef.current.set(key, addPromise)
+      try {
+        await addPromise
+      } catch {
+        /* error already surfaced */
+      }
+    },
+    [isLoggedIn, applyOptimisticItems, applyServerCart],
+  )
+
+  const setItemQuantity = useCallback(
+    async (product, quantity) => {
+      const qty = Math.max(0, Number(quantity) || 0)
+      setCartError('')
+
+      if (!isLoggedIn()) {
+        const updated = applyLocalQuantity(itemsRef.current, product, qty)
+        itemsRef.current = updated
+        writeGuestCart(updated)
+        setItems(updated)
+        return
+      }
+
+      const snapshot = itemsRef.current
+      const currentLine = findCartLine(snapshot, product)
+      const maxAllowed = maxAllowedForProduct(product, currentLine)
+
+      if (qty > maxAllowed) {
+        setCartError(`Only ${maxAllowed} available.`)
+      }
+
+      const targetQty = Math.min(qty, maxAllowed)
+      const key = lineKey({
+        ...product,
+        ...(currentLine || {}),
+        variantId: product.variantId || currentLine?.variantId || resolveVariantId(product),
+      })
+
+      applyOptimisticItems(applyLocalQuantity(snapshot, currentLine || product, targetQty))
+
+      let itemId = product.itemId || currentLine?.itemId
+      if (!itemId) {
+        const pendingAdd = pendingAddsRef.current.get(key)
+        if (pendingAdd) {
+          try {
+            itemId = await pendingAdd
+          } catch {
+            return
           }
         }
-        writeGuestCart(updated)
-        return updated
-      })
-      return
-    }
-
-    // Logged in: resolve itemId (backend cart line _id)
-    let itemId = product.itemId
-    if (!itemId) {
-      const prodId = product.productId || product.id || product._id
-      const backendItem = items.find(
-        (it) =>
-          it.itemId === product.itemId ||
-          it.productId === prodId ||
-          it.id === prodId ||
-          String(it.productId) === String(prodId) ||
-          String(it.id) === String(prodId) ||
-          (product.slug && it.slug === product.slug)
-      )
-      itemId = backendItem?.itemId
-    }
-
-    if (!itemId) {
-      console.warn('setItemQuantity: could not resolve itemId for product', product)
-      return
-    }
-
-    try {
-      if (qty === 0) {
-        const res = await cartApi.removeCartItem(itemId)
-        applyServerCart(res)
-      } else {
-        const res = await cartApi.updateCartItem(itemId, qty)
-        applyServerCart(res)
       }
-    } catch (err) {
-      console.error('setItemQuantity failed:', err.message)
-    }
-  }, [isLoggedIn, items])
 
-  // ── Quantity of ──────────────────────────────────────────────────────────────
-  const quantityOf = useCallback((product) => {
-    // For logged-in users: search backend cart items by productId or slug
-    const productId = product.productId || product.id || product._id
-    if (productId) {
-      const backendItem = items.find(
-        (item) =>
-          item.productId === productId ||
-          item.id === productId ||
-          String(item.productId) === String(productId) ||
-          String(item.id) === String(productId) ||
-          (product.slug && item.slug === product.slug)
-      )
-      if (backendItem) return backendItem.quantity
-    }
-    // Fallback for guest cart: check by key
-    const key = lineKey(product)
-    return items.find((item) => lineKey(item) === key || (item.productId || item.id) === productId)?.quantity ?? 0
-  }, [items])
+      if (!itemId) {
+        const refreshed = findCartLine(itemsRef.current, product)
+        itemId = refreshed?.itemId
+      }
 
-  // ── Clear cart ───────────────────────────────────────────────────────────────
+      if (!itemId) {
+        setCartError('Could not update that item. Please refresh and try again.')
+        applyOptimisticItems(snapshot)
+        return
+      }
+
+      await qtyQueueRef.current.enqueue({
+        key,
+        itemId,
+        quantity: targetQty,
+        snapshot,
+      })
+    },
+    [isLoggedIn, applyOptimisticItems],
+  )
+
+  /**
+   * Prefer this for +/- controls. Reads the latest quantity from itemsRef so
+   * rapid clicks before React re-renders are not lost.
+   */
+  const adjustItemQuantity = useCallback(
+    async (product, delta) => {
+      const change = Number(delta) || 0
+      if (!change) return
+
+      const currentLine = findCartLine(itemsRef.current, product)
+      const currentQty = currentLine?.quantity ?? 0
+      const nextQty = Math.max(0, currentQty + change)
+      return setItemQuantity(currentLine || product, nextQty)
+    },
+    [setItemQuantity],
+  )
+
+  const quantityOf = useCallback(
+    (product) => findCartLine(items, product)?.quantity ?? 0,
+    [items],
+  )
+
   const clearCart = useCallback(async () => {
+    const snapshot = itemsRef.current
+    const snapshotSubtotal = subtotal
+    qtyQueueRef.current?.clear()
+    pendingAddsRef.current.clear()
+    itemsRef.current = []
     setItems([])
     setSubtotal(0)
     writeGuestCart([])
+    setCartError('')
     if (!isLoggedIn()) return
     try {
       await cartApi.clearCart()
-    } catch (err) {
-      console.error('clearCart failed:', err.message)
+    } catch (error) {
+      setCartError(friendlyCartError(error))
+      itemsRef.current = snapshot
+      setItems(snapshot)
+      setSubtotal(snapshotSubtotal)
     }
-  }, [isLoggedIn])
-
+  }, [isLoggedIn, subtotal])
 
   const value = useMemo(
     () => ({
@@ -328,14 +401,31 @@ export function CartProvider({ children }) {
       count,
       subtotal: effectiveSubtotal,
       loading,
+      cartError,
+      clearCartError,
       addItem,
       setItemQuantity,
+      adjustItemQuantity,
       quantityOf,
       clearCart,
       syncCart,
       mergeGuestCart,
     }),
-    [items, count, effectiveSubtotal, loading, addItem, setItemQuantity, quantityOf, clearCart, syncCart, mergeGuestCart],
+    [
+      items,
+      count,
+      effectiveSubtotal,
+      loading,
+      cartError,
+      clearCartError,
+      addItem,
+      setItemQuantity,
+      adjustItemQuantity,
+      quantityOf,
+      clearCart,
+      syncCart,
+      mergeGuestCart,
+    ],
   )
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>
@@ -343,10 +433,8 @@ export function CartProvider({ children }) {
 
 export function useCart() {
   const context = useContext(CartContext)
-
   if (!context) {
     throw new Error('useCart must be used within CartProvider')
   }
-
   return context
 }
