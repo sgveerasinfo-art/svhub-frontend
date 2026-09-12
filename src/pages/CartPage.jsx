@@ -7,6 +7,7 @@ import { productHref } from '../data/products.js'
 import { getFeaturedProducts } from '../api/products.js'
 import { getStorefront } from '../data/storefronts.js'
 import { formatPrice } from '../utils/money.js'
+import { handleProductImageError, resolveDisplayProductImage } from '../utils/productImage.js'
 import CartRemoveModal from '../components/cart/CartRemoveModal.jsx'
 import CartLoginModal from '../components/cart/CartLoginModal.jsx'
 import './CartPage.css'
@@ -177,7 +178,11 @@ function CartLine({ item, onQuantity, onRemove }) {
   return (
     <article className="cart-line">
       <Link to={productHref(item)} className="cart-line__media" aria-label={`View ${item.name}`}>
-        <img src={item.image} alt="" />
+        <img
+          src={resolveDisplayProductImage(item.image)}
+          alt=""
+          onError={handleProductImageError}
+        />
       </Link>
 
       <div className="cart-line__body">
@@ -214,7 +219,11 @@ function RelatedCard({ product, onAdd }) {
     <article className={`cart-suggest ${houseClass(product.storefront)}`}>
       <div className="cart-suggest__media">
         <Link to={productHref(product)} aria-label={`View ${product.name}`}>
-          <img src={product.image} alt="" />
+          <img
+            src={resolveDisplayProductImage(product.image)}
+            alt=""
+            onError={handleProductImageError}
+          />
         </Link>
         <span className="cart-suggest__save" aria-hidden="true">
           <IconHeart />

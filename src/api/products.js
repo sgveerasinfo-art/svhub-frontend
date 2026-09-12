@@ -39,7 +39,9 @@ export async function getProducts(filters = {}) {
   if (filters.limit) params.set('limit', String(filters.limit))
 
   const query = params.toString()
-  return apiFetch(`/products${query ? `?${query}` : ''}`)
+  return apiFetch(`/products${query ? `?${query}` : ''}`, {
+    signal: filters.signal,
+  })
 }
 
 /**

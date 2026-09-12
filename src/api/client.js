@@ -24,13 +24,14 @@ export function readToken() {
   }
 }
 
-export async function apiFetch(path, { method = 'GET', body, auth = false } = {}) {
+export async function apiFetch(path, { method = 'GET', body, auth = false, signal } = {}) {
   const token = auth ? readToken() : ''
 
   let response
   try {
     response = await fetch(`${API_URL}${path}`, {
       method,
+      signal,
       headers: {
         Accept: 'application/json',
         ...(body ? { 'Content-Type': 'application/json' } : {}),
@@ -38,7 +39,8 @@ export async function apiFetch(path, { method = 'GET', body, auth = false } = {}
       },
       body: body ? JSON.stringify(body) : undefined,
     })
-  } catch {
+  } catch (error) {
+    if (error?.name === 'AbortError') throw error
     throw new ApiError('network', 'Could not reach SV Hub. Check your connection.', 0)
   }
 

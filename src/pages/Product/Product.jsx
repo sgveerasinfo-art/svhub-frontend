@@ -7,7 +7,7 @@ import { useCart } from '../../context/CartContext.jsx'
 import { getProduct, getRelatedProducts } from '../../api/products.js'
 import { getCategoryBySlug } from '../../data/categories.js'
 import { getStorefront } from '../../data/storefronts.js'
-import { defaultShipping, readViewed, rememberViewed, getProductDetail, relatedFor } from '../../data/productDetails.js'
+import { defaultShipping, readViewed, rememberViewed } from '../../data/productDetails.js'
 import ShopProduct from '../Shop/ShopProduct.jsx'
 import { formatPrice } from '../../utils/money.js'
 import './Product.css'
@@ -254,27 +254,14 @@ function Product() {
         if (res?.data?.length) {
           setRelated((res.data || []).map(enrichProduct))
         } else {
-          // Fallback related products from local catalog
-          const localFallback = getProductDetail(slug)
-          if (localFallback) {
-            setRelated((relatedFor(localFallback, 4) || []).map(enrichProduct))
-          }
+          setRelated([])
         }
       })
       .catch(() => {
-        // Fallback to static catalog if backend doesn't have it or returned 404
-        const staticProd = getProductDetail(slug)
-        if (staticProd) {
-          const enriched = enrichProduct(staticProd)
-          setProduct(enriched)
-          document.title = `${enriched.name} · SV Hub`
-          const staticRelated = (relatedFor(staticProd, 4) || []).map(enrichProduct)
-          setRelated(staticRelated)
-          setNotFound(false)
-        } else {
-          setNotFound(true)
-          document.title = PAGE_TITLE
-        }
+        // Do not fall back to the static local catalog — those images are stale
+        // category stock photos and would override the MongoDB source of truth.
+        setNotFound(true)
+        document.title = PAGE_TITLE
       })
       .finally(() => setLoading(false))
 

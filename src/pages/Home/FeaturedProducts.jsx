@@ -3,9 +3,10 @@ import { Link } from 'react-router-dom'
 import Reveal from '../../components/ui/Reveal.jsx'
 import CartStepper from '../../components/ui/CartStepper.jsx'
 import { featuredIntro } from '../../data/home.js'
-import { featuredProducts, productHref } from '../../data/products.js'
+import { productHref } from '../../data/products.js'
 import { getFeaturedProducts } from '../../api/products.js'
 import { getStorefront } from '../../data/storefronts.js'
+import { handleProductImageError, resolveDisplayProductImage } from '../../utils/productImage.js'
 import './FeaturedProducts.css'
 
 const stockLabels = {
@@ -81,7 +82,13 @@ function FeaturedItem({ product, layout }) {
             data-speed="0.1"
             aria-label={`View ${product.name}`}
           >
-            <img src={product.image} alt="" loading="lazy" decoding="async" />
+            <img
+              src={resolveDisplayProductImage(product.image)}
+              alt=""
+              loading="lazy"
+              decoding="async"
+              onError={handleProductImageError}
+            />
             <span className="featured-item__peek" aria-hidden="true">
               View product
               <Arrow size={13} />
@@ -123,7 +130,7 @@ function FeaturedItem({ product, layout }) {
 }
 
 function FeaturedProducts() {
-  const [items, setItems] = useState(featuredProducts)
+  const [items, setItems] = useState([])
 
   useEffect(() => {
     let cancelled = false

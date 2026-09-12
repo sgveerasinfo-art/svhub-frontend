@@ -3,6 +3,7 @@ import CartStepper from './CartStepper.jsx'
 import { productHref } from '../../data/products.js'
 import { getStorefront } from '../../data/storefronts.js'
 import { formatPrice } from '../../utils/money.js'
+import { handleProductImageError, resolveDisplayProductImage } from '../../utils/productImage.js'
 import './ProductCard.css'
 
 const stockLabels = {
@@ -24,7 +25,13 @@ function ProductCard({ product }) {
     >
       <div className="product-card__frame">
         <Link to={productTo} className="product-card__media" aria-label={`View ${product.name}`}>
-          <img src={product.image} alt="" loading="lazy" decoding="async" />
+          <img
+            src={resolveDisplayProductImage(product.image)}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            onError={handleProductImageError}
+          />
         </Link>
         {product.discount ? (
           <p className="product-card__badge">

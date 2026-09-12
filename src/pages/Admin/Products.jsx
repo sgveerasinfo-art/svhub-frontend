@@ -128,7 +128,18 @@ function ProductView({ product, categories, onClose, onEdit }) {
 
 function ProductThumb({ product }) {
   if (product.image) {
-    return <img className="admin-catalog__thumb" src={product.image} alt="" width="50" height="50" />
+    return (
+      <img
+        className="admin-catalog__thumb"
+        src={product.image}
+        alt=""
+        width="50"
+        height="50"
+        onError={(event) => {
+          event.currentTarget.src = '/catalog/_photo-required.svg'
+        }}
+      />
+    )
   }
   return (
     <span className="admin-catalog__thumb admin-catalog__thumb--mark" aria-hidden="true">

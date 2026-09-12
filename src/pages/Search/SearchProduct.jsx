@@ -3,6 +3,7 @@ import CartStepper from '../../components/ui/CartStepper.jsx'
 import { productHref } from '../../data/products.js'
 import { getStorefront } from '../../data/storefronts.js'
 import { formatPrice } from '../../utils/money.js'
+import { handleProductImageError, resolveDisplayProductImage } from '../../utils/productImage.js'
 import './SearchProduct.css'
 
 const stockLabels = {
@@ -44,7 +45,13 @@ function SearchProduct({ product, index }) {
 
       <div className="find-card__frame">
         <Link to={productTo} className="find-card__media" aria-label={`View ${product.name}`}>
-          <img src={product.image} alt="" loading="lazy" decoding="async" />
+          <img
+            src={resolveDisplayProductImage(product.image)}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            onError={handleProductImageError}
+          />
           <span className="find-card__view">
             View product <Arrow />
           </span>

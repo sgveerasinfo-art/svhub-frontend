@@ -3,6 +3,7 @@ import CartStepper from '../../components/ui/CartStepper.jsx'
 import { productHref } from '../../data/products.js'
 import { getStorefront } from '../../data/storefronts.js'
 import { formatPrice } from '../../utils/money.js'
+import { handleProductImageError, resolveDisplayProductImage } from '../../utils/productImage.js'
 import './ShopProduct.css'
 
 function ShopProduct({ product, index }) {
@@ -22,10 +23,11 @@ function ShopProduct({ product, index }) {
       <div className="shop-item__frame">
         <Link to={productTo} className="shop-item__media" aria-label={`View ${product.name}`}>
           <img
-            src={product.image}
+            src={resolveDisplayProductImage(product.image)}
             alt=""
             loading={index < 6 ? 'eager' : 'lazy'}
             decoding="async"
+            onError={handleProductImageError}
           />
         </Link>
 

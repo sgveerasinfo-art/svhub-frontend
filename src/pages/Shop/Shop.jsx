@@ -102,31 +102,64 @@ function Shop() {
   const [queryDraft, setQueryDraft] = useState(filters.q)
   const [sheet, setSheet] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
+  const [retryNonce, setRetryNonce] = useState(0)
   const [products, setProducts] = useState([])
   const [pagination, setPagination] = useState({ total: 0, totalPages: 1, page: 1 })
   const mainRef = useRef(null)
   const pageReady = useRef(false)
   const fetchRef = useRef(0)
 
-  // Fetch products from backend
+  // Fetch products from backend (auto-retry once for transient Atlas/DNS blips)
   useEffect(() => {
     const id = ++fetchRef.current
+    const controller = new AbortController()
+    let timedOut = false
+    const timeoutId = window.setTimeout(() => {
+      timedOut = true
+      controller.abort()
+    }, 20000)
     setLoading(true)
+    setLoadError('')
 
-    getProducts({ ...filters, limit: PAGE_SIZE })
-      .then((res) => {
-        if (id !== fetchRef.current) return // stale
+    async function load(attempt = 1) {
+      try {
+        const res = await getProducts({ ...filters, limit: PAGE_SIZE, signal: controller.signal })
+        if (id !== fetchRef.current) return
         setProducts(res.data || [])
         setPagination(res.pagination || { total: 0, totalPages: 1, page: filters.page || 1 })
-      })
-      .catch(() => {
+        setLoadError('')
+      } catch (error) {
         if (id !== fetchRef.current) return
+        if (error?.name === 'AbortError' && !timedOut) return
+
+        // One automatic retry for network / 5xx / timeout
+        if (attempt < 2 && !timedOut) {
+          await new Promise((r) => window.setTimeout(r, 800))
+          if (id !== fetchRef.current) return
+          return load(attempt + 1)
+        }
+
         setProducts([])
-      })
-      .finally(() => {
-        if (id === fetchRef.current) setLoading(false)
-      })
-  }, [filters])
+        setPagination({ total: 0, totalPages: 1, page: filters.page || 1 })
+        setLoadError(
+          timedOut
+            ? 'The shop is taking too long to respond. Please try again.'
+            : 'We could not load products right now. Please try again.',
+        )
+      }
+    }
+
+    load().finally(() => {
+      window.clearTimeout(timeoutId)
+      if (id === fetchRef.current) setLoading(false)
+    })
+
+    return () => {
+      window.clearTimeout(timeoutId)
+      controller.abort()
+    }
+  }, [filters, retryNonce])
 
   const total = pagination.total
   const totalPages = pagination.totalPages || 1
@@ -333,6 +366,20 @@ function Shop() {
                 </li>
               ))}
             </ul>
+          ) : loadError ? (
+            <div className="shop__empty" role="alert">
+              <p className="shop__empty-eyebrow">Temporary issue</p>
+              <h2>Products could not be loaded.</h2>
+              <p>{loadError}</p>
+              <button
+                type="button"
+                className="shop__empty-btn"
+                onClick={() => setRetryNonce((n) => n + 1)}
+              >
+                Try again
+                <Arrow />
+              </button>
+            </div>
           ) : products.length === 0 ? (
             <div className="shop__empty">
               <p className="shop__empty-eyebrow">No matches</p>

@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { handleProductImageError, resolveDisplayProductImage } from '../../utils/productImage.js'
 import './ProductGallery.css'
 
 function ProductGallery({ images, name, discount, accent }) {
@@ -38,6 +39,7 @@ function ProductGallery({ images, name, discount, accent }) {
   if (!current) return null
 
   const multi = images.length > 1
+  const currentSrc = resolveDisplayProductImage(current.src)
 
   return (
     <div
@@ -55,10 +57,11 @@ function ProductGallery({ images, name, discount, accent }) {
         onPointerUp={onPointerUp}
       >
         <img
-          key={current.src}
-          src={current.src}
+          key={currentSrc}
+          src={currentSrc}
           alt={current.alt || name}
           draggable="false"
+          onError={handleProductImageError}
         />
         {discount ? (
           <p className="pdp-gallery__badge">
@@ -107,7 +110,11 @@ function ProductGallery({ images, name, discount, accent }) {
                 aria-label={`View image ${index + 1} of ${images.length}`}
                 aria-current={index === active ? 'true' : undefined}
               >
-                <img src={image.src} alt="" />
+                <img
+                  src={resolveDisplayProductImage(image.src)}
+                  alt=""
+                  onError={handleProductImageError}
+                />
               </button>
             </li>
           ))}
