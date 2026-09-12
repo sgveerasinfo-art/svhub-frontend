@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import Reveal from '../../components/ui/Reveal.jsx'
 import { finalCta } from '../../data/home.js'
 import { images } from '../../data/images.js'
+import { LOGO_ALT, LOGO_SRC } from '../../data/brand.js'
 import './FinalCta.css'
 
 function splitHeadline(text) {
@@ -86,7 +87,7 @@ function FinalCta() {
             <span aria-hidden="true"> — </span>
             2026
           </p>
-          <p className="close__brand">SV Hub</p>
+          <img className="close__brand" src={LOGO_SRC} alt={LOGO_ALT} width={1024} height={1024} decoding="async" />
           <p className="close__seal-copy">Rooted in tradition</p>
         </Reveal>
       </div>

@@ -7,6 +7,7 @@ import { matchesQuery } from '../../data/admin.js'
 import { revokeAdminAccess } from '../../utils/adminAuth.js'
 import { Icon } from './icons.jsx'
 import { ConfirmDialog, ToastViewport } from './ui.jsx'
+import { LOGO_ALT, LOGO_SRC } from '../../data/brand.js'
 import './admin.css'
 
 const MAIN_NAV = [
@@ -37,7 +38,7 @@ function isMac() {
 function AdminBrand({ onNavigate }) {
   return (
     <Link to="/admin" className="admin-brand" onClick={onNavigate}>
-      <span className="admin-brand__mark">SV</span>
+      <img className="admin-brand__img" src={LOGO_SRC} alt={LOGO_ALT} width={1024} height={1024} decoding="async" />
       <span className="admin-brand__text">
         <span className="admin-brand__name">SV Hub</span>
         <span className="admin-brand__tag">Admin</span>

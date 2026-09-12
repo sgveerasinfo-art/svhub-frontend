@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { getOrder } from '../../api/orders.js'
 import { orderIdFromNumber } from '../../data/account.js'
+import { LOGO_ALT, LOGO_SRC } from '../../data/brand.js'
 import './OrderSuccess.css'
 
 const SAMPLE = {
@@ -208,7 +209,9 @@ function OrderSuccess() {
       </div>
 
       <div className="success__inner">
-        <p className="success__brand">SV Hub</p>
+        <Link to="/" className="success__brand" aria-label="SV Hub home">
+          <img src={LOGO_SRC} alt={LOGO_ALT} width={1024} height={1024} decoding="async" />
+        </Link>
 
         <article className="success__stage">
           <header className="success__hero">

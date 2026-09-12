@@ -51,18 +51,9 @@
   align-items: end;
 }
 
-.footer .logo__mark {
-  width: 48px;
-  height: 48px;
-  font-size: 18px;
-}
-
-.footer .logo__name {
-  font-size: 28px;
-}
-
-.footer .logo__tag {
-  letter-spacing: 0.16em;
+.footer .logo__img {
+  height: clamp(64px, 8vw, 88px);
+  border-radius: 14px;
 }
 
 .footer .logo {
@@ -70,7 +61,7 @@
 }
 
 .footer .logo:hover {
-  opacity: 0.82;
+  opacity: 0.92;
 }
 
 .footer__meta {

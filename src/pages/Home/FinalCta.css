@@ -236,12 +236,14 @@
 }
 
 .close__brand {
-  margin: 0;
-  color: var(--off-white);
-  font-family: var(--font-display);
-  font-size: 22px;
-  font-weight: 400;
-  letter-spacing: -0.02em;
+  display: block;
+  width: auto;
+  height: clamp(56px, 8vw, 72px);
+  margin: 0 auto;
+  aspect-ratio: 1;
+  object-fit: contain;
+  border-radius: 12px;
+  background: #fff;
 }
 
 .close__seal-copy {

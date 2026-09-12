@@ -87,16 +87,18 @@ html.admin-open #root {
   color: inherit;
 }
 
+.admin-brand__img {
+  display: block;
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  border-radius: 8px;
+  background: #fff;
+  flex-shrink: 0;
+}
+
 .admin-brand__mark {
-  display: grid;
-  place-items: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 7px;
-  background: var(--admin-accent);
-  color: #f6f6f6;
-  font-family: var(--font-display);
-  font-size: 13px;
+  display: none;
 }
 
 .admin-brand__text {
@@ -1686,12 +1688,10 @@ html.admin-open #root {
   gap: 12px;
 }
 
-.admin-login .admin-brand__mark {
-  width: 36px;
-  height: 36px;
-  background: #6e8c28;
-  color: #f5f4ef;
-  font-size: 14px;
+.admin-login .admin-brand__img {
+  width: 52px;
+  height: 52px;
+  border-radius: 10px;
 }
 
 .admin-login__lockup {
@@ -1886,6 +1886,11 @@ html.admin-open #root {
   .admin-sidebar .admin-sidenav__label,
   .admin-sidebar .admin-sidenav__link span {
     display: none;
+  }
+
+  .admin-sidebar .admin-brand__img {
+    width: 44px;
+    height: 44px;
   }
 
   .admin-sidebar .admin-sidenav__link {

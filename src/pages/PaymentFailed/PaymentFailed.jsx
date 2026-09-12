@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from 'react'
 import { Link, useLocation } from 'react-router-dom'
+import { LOGO_ALT, LOGO_SRC } from '../../data/brand.js'
 import './PaymentFailed.css'
 
 const SAMPLE = {
@@ -75,7 +76,9 @@ function PaymentFailed() {
     <section className="fail">
       <div className="fail__glow" aria-hidden="true" />
 
-      <p className="fail__brand">SV Hub</p>
+      <Link to="/" className="fail__brand" aria-label="SV Hub home">
+        <img src={LOGO_SRC} alt={LOGO_ALT} width={1024} height={1024} decoding="async" />
+      </Link>
 
       <article className="fail__card">
         <div className="fail__icon">

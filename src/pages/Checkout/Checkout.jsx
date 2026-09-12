@@ -11,6 +11,7 @@ import CheckoutAddressForm from './CheckoutAddressForm.jsx'
 import LocationPicker from './LocationPicker.jsx'
 import { loadRazorpayScript } from '../../lib/razorpay.js'
 import { formatPrice } from '../../utils/money.js'
+import Logo from '../../components/brand/Logo.jsx'
 import './Checkout.css'
 
 const STANDARD = 40
@@ -578,9 +579,7 @@ function Checkout() {
             <IconBack />
             Back to cart
           </Link>
-          <Link to="/" className="co-brand">
-            SV Hub
-          </Link>
+          <Logo compact />
           <span className="co-top__spacer" aria-hidden="true" />
         </header>
         <main className="co-main" style={{ display: 'grid', placeItems: 'center', minHeight: '50vh' }}>
@@ -664,9 +663,7 @@ function Checkout() {
           <IconBack />
           Back to cart
         </Link>
-        <Link to="/" className="co-brand">
-          SV Hub
-        </Link>
+        <Logo compact />
         <span className="co-top__spacer" aria-hidden="true" />
       </header>
 

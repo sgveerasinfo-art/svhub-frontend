@@ -4,6 +4,7 @@ import { AuthError } from '../../api/auth.js'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { AdminButton, FormField } from '../../components/admin/ui.jsx'
 import { Icon } from '../../components/admin/icons.jsx'
+import { LOGO_ALT, LOGO_SRC } from '../../data/brand.js'
 import '../../components/admin/admin.css'
 import {
   adminIdentifierError,
@@ -94,7 +95,7 @@ function AdminLogin() {
     <div className="admin-login">
       <aside className="admin-login__aside" aria-hidden="true">
         <div className="admin-login__brand">
-          <span className="admin-brand__mark">SV</span>
+          <img className="admin-brand__img" src={LOGO_SRC} alt={LOGO_ALT} width={1024} height={1024} decoding="async" />
           <span className="admin-login__lockup">
             <span className="admin-login__name">SV Hub</span>
             <span className="admin-login__tag">Admin</span>

@@ -1,18 +1,23 @@
 import { Link } from 'react-router-dom'
+import { LOGO_ALT, LOGO_SRC } from '../../data/brand.js'
 import './Logo.css'
 
-function Logo({ variant = 'light', compact = false }) {
+function Logo({ variant = 'light', compact = false, to = '/' }) {
   return (
-    <Link to="/" className={`logo logo--${variant}`} aria-label="SV Hub home">
-      <span className="logo__mark" aria-hidden="true">
-        SV
-      </span>
-      {!compact && (
-        <span className="logo__text">
-          <span className="logo__name">SV Hub</span>
-          <span className="logo__tag">Sadhguru Veera’s</span>
-        </span>
-      )}
+    <Link
+      to={to}
+      className={`logo logo--${variant}${compact ? ' logo--compact' : ''}`}
+      aria-label="SV Hub home"
+    >
+      <img
+        className="logo__img"
+        src={LOGO_SRC}
+        alt={LOGO_ALT}
+        width={1024}
+        height={1024}
+        decoding="async"
+        fetchPriority="high"
+      />
     </Link>
   )
 }

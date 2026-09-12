@@ -103,7 +103,19 @@
 }
 
 .success__brand {
-  display: none;
+  display: flex;
+  justify-content: center;
+  margin: 0 0 20px;
+}
+
+.success__brand img {
+  display: block;
+  height: clamp(48px, 10vw, 64px);
+  width: auto;
+  aspect-ratio: 1;
+  object-fit: contain;
+  border-radius: 10px;
+  background: #fff;
 }
 
 .success__stage {
@@ -481,15 +493,13 @@
   }
 
   .success__brand {
-    display: block;
-    margin: 0 0 48px;
-    font-family: var(--font-display);
-    font-size: 24px;
-    font-weight: 400;
-    line-height: 32px;
-    letter-spacing: 0.04em;
-    color: var(--success-primary);
-    text-align: center;
+    display: flex;
+    justify-content: center;
+    margin: 0 0 36px;
+  }
+
+  .success__brand img {
+    height: 64px;
   }
 
   .success__stage {

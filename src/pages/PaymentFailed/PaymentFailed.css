@@ -50,15 +50,20 @@
   left: 0;
   right: 0;
   z-index: 2;
+  display: flex;
+  justify-content: center;
   margin: 0;
-  padding: 32px 20px;
-  font-family: var(--font-display);
-  font-size: 24px;
-  font-weight: 400;
-  line-height: 32px;
-  letter-spacing: 0.02em;
-  color: var(--fail-primary);
-  text-align: center;
+  padding: 20px;
+}
+
+.fail__brand img {
+  display: block;
+  height: clamp(48px, 12vw, 64px);
+  width: auto;
+  aspect-ratio: 1;
+  object-fit: contain;
+  border-radius: 10px;
+  background: #fff;
 }
 
 .fail__card {
@@ -270,9 +275,11 @@
   }
 
   .fail__brand {
-    font-size: 32px;
-    line-height: 40px;
-    padding: 32px 80px;
+    padding: 28px 80px;
+  }
+
+  .fail__brand img {
+    height: 64px;
   }
 
   .fail__card {

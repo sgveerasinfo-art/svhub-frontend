@@ -52,12 +52,13 @@
   text-transform: uppercase;
 }
 
-.co-brand {
-  color: var(--co-primary);
-  font-family: var(--font-display);
-  font-size: 24px;
-  font-weight: 400;
-  line-height: 32px;
+.co-brand,
+.co-top .logo {
+  justify-self: center;
+}
+
+.co-top .logo__img {
+  height: 48px;
 }
 
 .co-top__spacer {
@@ -1995,9 +1996,8 @@
     padding: 10px max(14px, var(--safe-left)) 10px max(14px, var(--safe-right));
   }
 
-  .co-brand {
-    font-size: 22px;
-    line-height: 28px;
+  .co-top .logo__img {
+    height: 40px;
   }
 
   .co-back {

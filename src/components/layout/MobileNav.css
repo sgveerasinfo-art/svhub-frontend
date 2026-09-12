@@ -60,6 +60,10 @@
   gap: var(--space-16);
 }
 
+.mobile-nav__top .logo__img {
+  height: 48px;
+}
+
 .mobile-nav__close {
   display: grid;
   place-items: center;
