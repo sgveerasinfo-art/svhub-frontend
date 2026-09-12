@@ -15,6 +15,14 @@ The photo-required placeholder must not be assigned to any live catalog SKU.
 
 ## Forbidden
 
-- Competitor packaging (Qualityfress, Spice Nest, Penzeys, …)
+- Competitor packaging (Qualityfress / Quityfress, Spice Nest, Penzeys, …)
 - Known wrong researched remotes (Pexels bird `14443199`, sailboat `11353753`, etc.)
 - Assigning `/catalog/_photo-required.svg` to any of the 59 products
+
+## Local replacements (unbranded)
+
+| File | Subject | Notes |
+|------|---------|-------|
+| `cumin-powder.jpg` | Ground cumin + whole cumin seeds on spoons | Replaced Quityfress packet |
+| `coriander-powder.jpg` | Ground coriander in masala dabba | Replaced Quityfress packet; Wikimedia Commons |
+| `ginger-garlic-paste.jpg` | Fresh ginger + garlic (ingredients) | Replaced Spice Nest jar; Wikimedia Commons |
