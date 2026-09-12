@@ -13,7 +13,7 @@ export const heroContent = {
 export const stats = [
   { value: '50+', label: 'Products', dummy: true },
   { value: '500+', label: 'Happy Customers', dummy: true },
-  { value: '100%', label: 'Organic', dummy: true },
+  { value: '100%', label: 'Natural', dummy: true },
   { value: '2', label: 'Storefronts', dummy: true },
 ]
 

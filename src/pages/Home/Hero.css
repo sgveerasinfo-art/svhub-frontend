@@ -123,6 +123,14 @@
   will-change: transform;
 }
 
+/* Laptop+: clip farm photo so hero never extends past one viewport */
+@media (min-width: 1024px) {
+  .hero {
+    max-height: 100vh;
+    overflow: hidden;
+  }
+}
+
 @media (max-width: 1023px) {
   .hero {
     padding-top: 80px;
