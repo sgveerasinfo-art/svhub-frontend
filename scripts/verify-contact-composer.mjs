@@ -66,7 +66,7 @@ assert.match(mail1.body, /Message:\n\nHi/)
 const case6 = {
   name: 'Venkat',
   email: 'test@example.com',
-  phone: '+91 98765 43210',
+  phone: '+91 93463 99677',
   message: 'Can you help me?',
 }
 
@@ -85,7 +85,7 @@ assert.equal(
     '',
     'Name: Venkat',
     'Email: test@example.com',
-    'Phone: 9876543210',
+    'Phone: 9346399677',
     '',
     'Message:',
     'Can you help me?',
@@ -98,7 +98,7 @@ const wa6 = decodeWhatsAppText(whatsappHref(case6))
 assert.equal(wa6, wa6Text)
 assert.ok(wa6.includes('Name: Venkat'))
 assert.ok(wa6.includes('Email: test@example.com'))
-assert.ok(wa6.includes('Phone: 9876543210'))
+assert.ok(wa6.includes('Phone: 9346399677'))
 assert.ok(wa6.includes('Can you help me?'))
 
 const mail6 = decodeMailto(mailHref(case6))
@@ -106,13 +106,13 @@ assert.equal(mail6.subject, buildEmailSubject(case6))
 assert.equal(mail6.body, buildEmailBody(case6))
 assert.ok(mail6.body.includes('Name: Venkat'))
 assert.ok(mail6.body.includes('Email: test@example.com'))
-assert.ok(mail6.body.includes('Phone: 9876543210'))
+assert.ok(mail6.body.includes('Phone: 9346399677'))
 assert.ok(mail6.body.includes('Can you help me?'))
 
 const special = {
   name: "O'Brien",
   email: 'test+tag@example.com',
-  phone: '09876543210',
+  phone: '09346399677',
   message: 'Need rice & soap — asap?\nLine two',
 }
 
@@ -120,16 +120,16 @@ const waSpecial = decodeWhatsAppText(whatsappHref(special))
 assert.ok(waSpecial.includes("O'Brien"))
 assert.ok(waSpecial.includes('Need rice & soap — asap?'))
 assert.ok(waSpecial.includes('Line two'))
-assert.ok(waSpecial.includes('Phone: 9876543210'))
+assert.ok(waSpecial.includes('Phone: 9346399677'))
 
 const mailSpecial = decodeMailto(mailHref(special))
 assert.ok(mailSpecial.body.includes("O'Brien"))
 assert.ok(mailSpecial.body.includes('Need rice & soap — asap?'))
 assert.ok(mailSpecial.body.includes('Line two'))
 
-assert.equal(contact.whatsappUrl, 'https://wa.me/919876543210')
-assert.equal(contact.email, 'hello@svhub.in')
-assert.ok(whatsappHref(case1).startsWith('https://wa.me/919876543210?text='))
-assert.ok(mailHref(case1).startsWith('mailto:hello@svhub.in?'))
+assert.equal(contact.whatsappUrl, 'https://wa.me/919346399677')
+assert.equal(contact.email, 'info@svhub.com')
+assert.ok(whatsappHref(case1).startsWith('https://wa.me/919346399677?text='))
+assert.ok(mailHref(case1).startsWith('mailto:info@svhub.com?'))
 
 console.log('contactComposer: all cases passed')

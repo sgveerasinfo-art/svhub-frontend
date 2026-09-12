@@ -292,9 +292,9 @@ export const terms = {
         {
           parts: [
             'For questions about these Terms, write to ',
-            { href: 'mailto:hello@svhub.in', label: 'hello@svhub.in' },
+            { href: 'mailto:info@svhub.com', label: 'info@svhub.com' },
             ', call ',
-            { href: 'tel:+919876543210', label: '+91 98765 43210' },
+            { href: 'tel:+919346399677', label: '+91 93463 99677' },
             ', or use our ',
             { to: '/contact', label: 'Contact' },
             ' page.',

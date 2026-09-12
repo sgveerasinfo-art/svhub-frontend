@@ -375,7 +375,7 @@ function orderItem(productId, quantity = 1) {
 
 export function defaultSettings() {
   return {
-    supportEmail: 'hello@svhub.in',
+    supportEmail: 'info@svhub.com',
     supportPhone: '+91 422 450 2100',
     freeShippingFrom: 799,
     standardShipping: 40,
