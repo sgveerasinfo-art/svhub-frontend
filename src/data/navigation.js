@@ -7,7 +7,7 @@ export const homeLink = { to: '/', label: 'Home', end: true }
 
 /** Primary shopping destinations — visually grouped in the header */
 export const primaryDestinations = [
-  { to: '/shop', label: 'Shop' },
+  { to: '/shop', label: 'Shop', featured: true },
   { to: '/nutri-hub', label: 'Nutri-Hub' },
   { to: '/self-care', label: 'Self-Care' },
 ]

@@ -49,7 +49,7 @@ function IconCart() {
   )
 }
 
-function NavItem({ to, label, end = false, primary = false }) {
+function NavItem({ to, label, end = false, primary = false, featured = false }) {
   return (
     <NavLink
       to={to}
@@ -58,6 +58,7 @@ function NavItem({ to, label, end = false, primary = false }) {
         [
           'navbar__link',
           primary ? 'navbar__link--primary' : '',
+          featured ? 'navbar__link--shop' : '',
           isActive ? 'navbar__link--active' : '',
         ]
           .filter(Boolean)
@@ -131,7 +132,13 @@ function Navbar() {
 
           <div className="navbar__primary" role="group" aria-label="Shop destinations">
             {primaryDestinations.map((link) => (
-              <NavItem key={link.to} to={link.to} label={link.label} primary />
+              <NavItem
+                key={link.to}
+                to={link.to}
+                label={link.label}
+                primary
+                featured={Boolean(link.featured)}
+              />
             ))}
           </div>
 
