@@ -1,4 +1,4 @@
-import Hero from './Hero.jsx'
+import HeroRenderer from './HeroRenderer.jsx'
 import StatsStrip from './StatsStrip.jsx'
 import Storefronts from './Storefronts.jsx'
 import FeaturedProducts from './FeaturedProducts.jsx'
@@ -13,7 +13,7 @@ import './Home.css'
 function Home() {
   return (
     <HomeScroll>
-      <Hero />
+      <HeroRenderer />
       <StatsStrip />
       <Storefronts />
       <FeaturedProducts />

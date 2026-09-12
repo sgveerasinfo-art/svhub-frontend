@@ -1,6 +1,7 @@
 import heroFarm from '../assets/hero-farm.png'
 import authKitchen from '../assets/auth-kitchen.jpg'
 import nutriHero from '../assets/nutri-hero.jpg'
+import ganeshArt from '../assets/ganesh-chaturthi-art.webp'
 
 const pexels = (id, w) =>
   `https://images.pexels.com/photos/${id}/pexels-photo-${id}.jpeg?auto=compress&cs=tinysrgb&w=${w}`
@@ -10,6 +11,7 @@ const unsplash = (id, w) =>
 
 export const images = {
   hero: heroFarm,
+  ganeshArt,
   authKitchen,
   nutriHub: unsplash('photo-1673158191698-f1550a68c422', 1400),
   nutriHero,
