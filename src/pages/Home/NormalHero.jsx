@@ -31,7 +31,7 @@ function NormalHero() {
           <h1 id="home-hero-heading">{heroContent.title}</h1>
           <p className="hero__description">{heroContent.copy}</p>
           <Link to={heroContent.ctaTo} className="hero__button">
-            {heroContent.cta}
+            Shop Now
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
               <path
                 d="M3 8h10M9 4l4 4-4 4"
