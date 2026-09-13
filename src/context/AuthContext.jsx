@@ -76,6 +76,7 @@ export function AuthProvider({ children }) {
       const onAuthScreen =
         path === '/login' ||
         path === '/admin/login' ||
+        path === '/admin/setup' ||
         path === '/register' ||
         path === '/forgot-password' ||
         path === '/reset-password'

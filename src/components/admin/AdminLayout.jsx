@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext.jsx'
 import { AdminStoreProvider, useAdminStore } from '../../context/AdminStore.jsx'
 import { AdminUiProvider, useAdminUi } from '../../context/AdminUi.jsx'
 import { matchesQuery } from '../../data/admin.js'
-import { revokeAdminAccess } from '../../utils/adminAuth.js'
+import { clearAdminLocalState, hasPermission, PERMISSIONS } from '../../utils/adminPermissions.js'
 import { Icon } from './icons.jsx'
 import { ConfirmDialog, ToastViewport } from './ui.jsx'
 import { LOGO_ALT, LOGO_SRC } from '../../data/brand.js'
@@ -20,7 +20,12 @@ const MAIN_NAV = [
 
 const MANAGEMENT_NAV = [{ to: '/admin/inventory', label: 'Inventory', icon: 'inventory' }]
 
-const ALL_NAV = [...MAIN_NAV, ...MANAGEMENT_NAV, { to: '/admin/settings', label: 'Settings', icon: 'settings' }]
+const ALL_NAV = [
+  ...MAIN_NAV,
+  ...MANAGEMENT_NAV,
+  { to: '/admin/settings', label: 'Settings', icon: 'settings' },
+  { to: '/admin/access', label: 'Manage Access', icon: 'customers' },
+]
 
 function titleFromPath(pathname) {
   if (pathname === '/admin') return 'Dashboard'
@@ -68,7 +73,7 @@ function NavGroup({ title, items, onNavigate }) {
   )
 }
 
-function NavList({ onNavigate, onLogout }) {
+function NavList({ onNavigate, onLogout, canManageAccess }) {
   return (
     <nav className="admin-sidenav" aria-label="Admin">
       <NavGroup title="Main" items={MAIN_NAV} onNavigate={onNavigate} />
@@ -83,6 +88,17 @@ function NavList({ onNavigate, onLogout }) {
           <Icon name="settings" size={16} />
           <span>Settings</span>
         </NavLink>
+        {canManageAccess ? (
+          <NavLink
+            to="/admin/access"
+            title="Manage Access"
+            className={({ isActive }) => `admin-sidenav__link${isActive ? ' is-active' : ''}`}
+            onClick={onNavigate}
+          >
+            <Icon name="customers" size={16} />
+            <span>Manage Access</span>
+          </NavLink>
+        ) : null}
         <button type="button" className="admin-sidenav__link admin-sidenav__logout" onClick={onLogout}>
           <Icon name="logout" size={16} />
           <span>Logout</span>
@@ -327,6 +343,8 @@ function AdminShell() {
 
   const closeMenu = () => setMenuOpen(false)
 
+  const canManageAccess = hasPermission(user, PERMISSIONS.ACCESS_MANAGE)
+
   async function handleLogout() {
     closeMenu()
     const ok = await confirm({
@@ -336,7 +354,7 @@ function AdminShell() {
       danger: true,
     })
     if (!ok) return
-    revokeAdminAccess()
+    clearAdminLocalState()
     await logout()
     navigate('/admin/login', { replace: true })
   }
@@ -345,7 +363,7 @@ function AdminShell() {
     <div className="admin">
       <aside className="admin-sidebar">
         <AdminBrand />
-        <NavList onLogout={handleLogout} />
+        <NavList onLogout={handleLogout} canManageAccess={canManageAccess} />
       </aside>
 
       <div
@@ -361,7 +379,7 @@ function AdminShell() {
               <Icon name="close" />
             </button>
           </div>
-          <NavList onNavigate={closeMenu} onLogout={handleLogout} />
+          <NavList onNavigate={closeMenu} onLogout={handleLogout} canManageAccess={canManageAccess} />
         </div>
       </div>
 

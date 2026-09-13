@@ -5,20 +5,13 @@ import { useAuth } from '../../context/AuthContext.jsx'
 import { AdminButton, FormField } from '../../components/admin/ui.jsx'
 import { Icon } from '../../components/admin/icons.jsx'
 import { LOGO_ALT, LOGO_SRC } from '../../data/brand.js'
+import { adminIdentifierError, clearAdminLocalState, hasAdminAccess } from '../../utils/adminPermissions.js'
 import '../../components/admin/admin.css'
-import {
-  adminIdentifierError,
-  grantAdminAccess,
-  grantLocalAdminAccess,
-  hasAdminAccess,
-  isAllowedAdminEmail,
-  isLocalAdminCredentials,
-  isLocalAdminUsername,
-  revokeAdminAccess,
-} from '../../utils/adminAuth.js'
 
 function safeFrom(path) {
-  if (!path || !path.startsWith('/admin') || path === '/admin/login') return '/admin'
+  if (!path || !path.startsWith('/admin') || path === '/admin/login' || path.startsWith('/admin/setup')) {
+    return '/admin'
+  }
   return path
 }
 
@@ -37,6 +30,7 @@ function AdminLogin() {
 
   useEffect(() => {
     document.documentElement.classList.add('admin-open')
+    clearAdminLocalState()
     return () => document.documentElement.classList.remove('admin-open')
   }, [])
 
@@ -60,29 +54,16 @@ function AdminLogin() {
 
     setBusy(true)
     try {
-      let session
-      if (isLocalAdminCredentials(email, password)) {
-        // Authenticate with the authoritative backend admin user
-        session = await login({ identifier: 'admin@svhub.in', password: 'Admin@123' })
-      } else if (isLocalAdminUsername(email)) {
-        revokeAdminAccess()
-        setFormError('That username and password didn’t match. Please try again.')
-        return
-      } else {
-        session = await login({ identifier: email, password })
-      }
-
-      const role = String(session?.role || '').toUpperCase()
-      if (role !== 'ADMIN' && !isAllowedAdminEmail(session?.email)) {
-        revokeAdminAccess()
+      const session = await login({ identifier: email.trim(), password })
+      if (!hasAdminAccess(session)) {
         await logout()
+        clearAdminLocalState()
         setFormError('This account does not have operations access.')
         return
       }
-      grantAdminAccess(session)
       navigate(from, { replace: true })
     } catch (error) {
-      revokeAdminAccess()
+      clearAdminLocalState()
       setFormError(
         error instanceof AuthError ? error.message : 'Could not sign in. Check your details and try again.',
       )
@@ -101,9 +82,7 @@ function AdminLogin() {
             <span className="admin-login__tag">Admin</span>
           </span>
         </div>
-        <p className="admin-login__aside-copy">
-          Catalogue, orders and inventory for authorised staff.
-        </p>
+        <p className="admin-login__aside-copy">Catalogue, orders and inventory for authorised staff.</p>
       </aside>
 
       <main className="admin-login__main">
@@ -111,7 +90,7 @@ function AdminLogin() {
           <header className="admin-login__head">
             <p className="admin-login__eyebrow">Operations</p>
             <h1 className="admin-title">Admin Login</h1>
-            <p className="admin-login__copy">Enter your staff credentials to continue.</p>
+            <p className="admin-login__copy">Sign in with your staff email and password.</p>
           </header>
 
           {formError ? (
@@ -121,13 +100,13 @@ function AdminLogin() {
             </p>
           ) : null}
 
-          <FormField label="Email or username" error={emailErr}>
+          <FormField label="Email" error={emailErr}>
             <input
               id="admin-login-email"
-              type="text"
+              type="email"
               autoComplete="username"
-              inputMode="text"
-              placeholder="admin"
+              inputMode="email"
+              placeholder="you@company.com"
               value={email}
               disabled={busy}
               onChange={(event) => setEmail(event.target.value)}

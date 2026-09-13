@@ -16,7 +16,7 @@ function ForgotPassword() {
   const [touched, setTouched] = useState(false)
   const [busy, setBusy] = useState(false)
   const [formError, setFormError] = useState('')
-  const [sent, setSent] = useState(null)
+  const [sentEmail, setSentEmail] = useState('')
 
   useEffect(() => {
     window.scrollTo(0, 0)
@@ -32,8 +32,8 @@ function ForgotPassword() {
 
     setBusy(true)
     try {
-      const result = await requestReset(email)
-      setSent(result)
+      await requestReset(email)
+      setSentEmail(email.trim())
     } catch (error) {
       setFormError(
         error instanceof AuthError
@@ -47,17 +47,14 @@ function ForgotPassword() {
 
   return (
     <AuthLayout variant="card" image={images.authKitchen} imageAlt="">
-      {sent ? (
+      {sentEmail ? (
         <AuthSuccess
           eyebrow="Account"
           title="Check your inbox"
-          copy={`Reset instructions have been sent to ${maskEmail(sent.email)}. Follow the link in that message to choose a new password.`}
+          copy={`If an account exists for ${maskEmail(sentEmail)}, password reset instructions have been sent. Follow the email link to choose a new password.`}
         >
           <p className="auth__hint">
-            Use the reset link we created for your account.{' '}
-            <Link className="auth__text-link" to={`/reset-password?token=${sent.token}`}>
-              Continue to reset password
-            </Link>
+            For security, we do not reveal whether an account exists for that address.
           </p>
           <Button to="/login" className="auth__submit">
             BACK TO LOGIN

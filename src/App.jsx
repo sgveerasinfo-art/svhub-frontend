@@ -13,9 +13,14 @@ import AdminProductNew from './pages/Admin/ProductNew.jsx'
 import AdminProductEdit from './pages/Admin/ProductEdit.jsx'
 import AdminInventory from './pages/Admin/Inventory.jsx'
 import AdminCategories from './pages/Admin/Categories.jsx'
+import AdminCoupons from './pages/Admin/Coupons.jsx'
 import AdminCustomers from './pages/Admin/Customers.jsx'
 import AdminSettings from './pages/Admin/Settings.jsx'
 import AdminLogin from './pages/Admin/Login.jsx'
+import AdminSetup from './pages/Admin/AdminSetup.jsx'
+import ManageAccess from './pages/Admin/ManageAccess.jsx'
+import RequirePermission from './components/admin/RequirePermission.jsx'
+import { PERMISSIONS } from './utils/adminPermissions.js'
 import Home from './pages/Home/Home.jsx'
 import Shop from './pages/Shop/Shop.jsx'
 import NutriHub from './pages/NutriHub/NutriHub.jsx'
@@ -55,6 +60,7 @@ function App() {
           <SystemErrorBoundary>
             <Routes>
               <Route path="/admin/login" element={<AdminLogin />} />
+              <Route path="/admin/setup" element={<AdminSetup />} />
               <Route element={<RequireAdmin />}>
                 <Route path="/admin" element={<AdminLayout />}>
                   <Route index element={<AdminDashboard />} />
@@ -66,8 +72,12 @@ function App() {
                   <Route path="products/:id/edit" element={<AdminProductEdit />} />
                   <Route path="inventory" element={<AdminInventory />} />
                   <Route path="categories" element={<AdminCategories />} />
+                  <Route path="coupons" element={<AdminCoupons />} />
                   <Route path="customers" element={<AdminCustomers />} />
                   <Route path="settings" element={<AdminSettings />} />
+                  <Route element={<RequirePermission permission={PERMISSIONS.ACCESS_MANAGE} />}>
+                    <Route path="access" element={<ManageAccess />} />
+                  </Route>
                   <Route path="system-states" element={<SystemStatesPage />} />
                   <Route path="*" element={<Navigate to="/admin" replace />} />
                 </Route>

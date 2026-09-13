@@ -1,0 +1,140 @@
+.access-page {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.access-banner,
+.access-bootstrap {
+  margin: 0;
+  padding: 0.9rem 1rem;
+  border: 1px solid color-mix(in srgb, var(--admin-line, #d7d0c4) 80%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--admin-surface, #fff) 92%, #f4efe4);
+  color: var(--admin-ink, #2b241c);
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.access-bootstrap {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.access-bootstrap__url {
+  display: block;
+  overflow-wrap: anywhere;
+  padding: 0.65rem 0.75rem;
+  border-radius: 8px;
+  background: #1f1a14;
+  color: #f7f1e6;
+  font-size: 0.8rem;
+}
+
+.access-bootstrap__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.access-panel {
+  overflow: hidden;
+}
+
+.access-you {
+  margin-left: 0.45rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, #2f6b4f 18%, transparent);
+  color: #2f6b4f;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.access-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.access-action {
+  border: 0;
+  background: transparent;
+  color: #2f6b4f;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0.15rem 0.2rem;
+}
+
+.access-action:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.access-action--danger {
+  color: #9b2c2c;
+}
+
+.access-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+}
+
+.access-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(20, 16, 12, 0.45);
+  cursor: pointer;
+}
+
+.access-modal__panel {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 440px);
+  display: grid;
+  gap: 0.85rem;
+  padding: 1.15rem 1.2rem 1.25rem;
+  border-radius: 16px;
+  background: var(--admin-surface, #fffdf8);
+  box-shadow: 0 18px 50px rgba(20, 16, 12, 0.22);
+}
+
+.access-modal__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.access-modal__head h2 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.access-modal__copy {
+  margin: 0;
+  color: color-mix(in srgb, var(--admin-ink, #2b241c) 72%, transparent);
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.access-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  margin-top: 0.25rem;
+}
+
+@media (max-width: 720px) {
+  .access-actions {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
