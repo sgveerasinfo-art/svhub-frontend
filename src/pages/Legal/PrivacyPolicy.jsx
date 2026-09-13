@@ -161,8 +161,8 @@ function PrivacyPolicy() {
           <section id="updates" aria-labelledby="updates-heading">
             <h2 id="updates-heading">Updates to this page</h2>
             <p>
-              When the approved policy is published, we will date it clearly. If we make important changes
-              later, we will update this page and, where appropriate, let account holders know.
+              If we make important changes to this page, we will update the date above and, where appropriate,
+              let account holders know.
             </p>
           </section>
 
