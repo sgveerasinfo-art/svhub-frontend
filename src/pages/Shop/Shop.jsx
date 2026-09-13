@@ -173,12 +173,24 @@ function Shop() {
     ? 'Loading products…'
     : loadError
       ? 'Products unavailable'
-      : `${total} ${total === 1 ? 'product' : 'products'}`
+      : total === 0
+        ? '0 products'
+        : total === 1
+          ? '1 product'
+          : '50+ products'
   const catalogMeta = loading
     ? `Loading catalogue · ${storefronts.length} houses`
     : loadError
       ? `Catalogue unavailable · ${storefronts.length} houses`
-      : `${total} products · ${storefronts.length} houses`
+      : total === 0
+        ? `0 products · ${storefronts.length} houses`
+        : `50+ products · ${storefronts.length} houses`
+  const rangeLabel = total
+    ? `${rangeStart}–${rangeEnd} of ${total === 1 ? '1' : '50+'}`
+    : countLabel
+  const showingLabel = total
+    ? `Showing ${rangeStart}–${rangeEnd} of ${total === 1 ? '1' : '50+'}`
+    : countLabel
   const pages = pagerPages(page, totalPages)
 
   const applyFilters = useCallback(
@@ -319,7 +331,7 @@ function Shop() {
           Sort
         </button>
         <p className="shop__dock-count" aria-live="polite">
-          {total ? `${rangeStart}–${rangeEnd} of ${total}` : countLabel}
+          {rangeLabel}
         </p>
       </div>
 
@@ -345,9 +357,7 @@ function Shop() {
         <div className="shop__main" ref={mainRef}>
           <div className="shop__toolbar">
             <p className="shop__count" aria-live="polite">
-              {total
-                ? `Showing ${rangeStart}–${rangeEnd} of ${total}`
-                : countLabel}
+              {showingLabel}
             </p>
 
             <label className="shop__sort" htmlFor="shop-sort">
@@ -410,7 +420,7 @@ function Shop() {
 
               <div className="shop__footer">
                 <p className="shop__shown">
-                  Showing {rangeStart}–{rangeEnd} of {total}
+                  {showingLabel}
                 </p>
                 {totalPages > 1 ? (
                   <nav className="shop__pager" aria-label="Product pages">
