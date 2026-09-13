@@ -31,12 +31,7 @@ function PrivacyPolicy() {
           <p className="policy__lede">
             How SV Hub looks after the information you share with us — simply, and with care.
           </p>
-          <p className="policy__draft" role="note">
-            <span>Draft for V1</span>
-            This is placeholder copy for design and review. The final Privacy Policy will be supplied and
-            approved by SV Hub before this page goes live.
-          </p>
-          <p className="policy__meta">Last updated: August 2026 · Draft, not yet approved</p>
+          <p className="policy__meta">Last updated: August 2026</p>
         </header>
 
         <nav className="policy__toc" aria-label="On this page">
@@ -55,12 +50,8 @@ function PrivacyPolicy() {
             <h2 id="who-we-are-heading">Who we are</h2>
             <p>
               SV Hub (Sadhguru Veera’s) is an organic food and natural self-care brand based in Coimbatore,
-              Tamil Nadu. This draft describes, in plain language, how we intend to handle personal information
-              when you visit svhub.in, create an account, or place an order.
-            </p>
-            <p>
-              Until the client-approved policy is published, nothing on this page should be treated as a final
-              legal statement.
+              Tamil Nadu. This page explains, in plain language, how we handle personal information when you
+              visit our website, create an account, or place an order.
             </p>
           </section>
 
@@ -114,9 +105,8 @@ function PrivacyPolicy() {
           <section id="payments" aria-labelledby="payments-heading">
             <h2 id="payments-heading">Payments</h2>
             <p>
-              Card and UPI payments are intended to be processed by our payment partner. SV Hub does not store
-              full card numbers on this website. The final policy will name the payment provider and describe
-              how payment data is handled.
+              Card and UPI payments are processed by our payment partner. SV Hub does not store full card
+              numbers on this website.
             </p>
           </section>
 
@@ -132,9 +122,8 @@ function PrivacyPolicy() {
           <section id="retention" aria-labelledby="retention-heading">
             <h2 id="retention-heading">How long we keep information</h2>
             <p>
-              We plan to keep account and order information only for as long as it is needed to fulfil orders,
-              provide support, and meet record-keeping duties. Exact retention periods will be confirmed in the
-              approved policy.
+              We keep account and order information only for as long as it is needed to fulfil orders, provide
+              support, and meet record-keeping duties.
             </p>
           </section>
 

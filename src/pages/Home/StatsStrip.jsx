@@ -10,10 +10,7 @@ function StatsStrip() {
           {stats.map((stat) => (
             <article key={stat.label} className="stats__item">
               <p className="stats__value">{stat.value}</p>
-              <p className="stats__label">
-                {stat.label}
-                {stat.dummy ? <span className="sr-only"> Placeholder statistic for V1</span> : null}
-              </p>
+              <p className="stats__label">{stat.label}</p>
             </article>
           ))}
         </Reveal>

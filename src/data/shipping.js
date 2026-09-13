@@ -3,9 +3,6 @@ export const shippingPolicy = {
   title: 'Shipping Policy',
   lede: 'How SV Hub packs and sends orders from Coimbatore — clearly, and without surprises at the door.',
   lastUpdated: 'August 2026',
-  draftLabel: 'Draft for V1',
-  draftNotice:
-    'This is placeholder copy for design and review. Final shipping areas, charges, times and courier partners will be supplied and approved by SV Hub before this page goes live. Until then, nothing here should be treated as a binding shipping rule.',
   related: [
     { to: '/privacy-policy', label: 'Privacy Policy' },
     { to: '/terms-and-conditions', label: 'Terms & Conditions' },
@@ -64,24 +61,24 @@ export const shippingPolicy = {
     {
       kicker: 'Indicative',
       title: 'Rest of India',
-      copy: 'Longer routes take more working days. Checkout may show a standard or faster option — those timings are placeholders until this policy is approved.',
+      copy: 'Longer routes take more working days. Checkout may show a standard or faster option based on your pincode and available carriers.',
     },
   ],
   charges: [
     {
       kicker: 'At checkout',
       title: 'Shown before you pay',
-      copy: 'Shipping is calculated on the checkout page. Cart totals currently say “calculated at checkout” on purpose.',
+      copy: 'Shipping is calculated on the checkout page before you pay.',
     },
     {
-      kicker: 'Placeholder',
+      kicker: 'Thresholds',
       title: 'Shop figures',
-      copy: 'The V1 shop may show a free-shipping note and standard or faster rates. Those numbers are dummy data, not the final tariff.',
+      copy: 'Checkout shows the free-shipping threshold and standard or faster rates based on your cart and address.',
     },
     {
-      kicker: 'To be approved',
-      title: 'What we will not invent',
-      copy: 'Courier names, COD rules, extra remote charges and festival surcharges will be added only when SV Hub approves them.',
+      kicker: 'Extras',
+      title: 'Special charges',
+      copy: 'Any remote-area, COD, or festival surcharges will be shown clearly at checkout before you pay.',
     },
   ],
 }

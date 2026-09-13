@@ -52,11 +52,6 @@ function RefundPolicy() {
               <dd>{page.lastUpdated}</dd>
             </div>
           </dl>
-
-          <p className="policy__draft" role="note">
-            <span>{page.draftLabel}</span>
-            {page.draftNotice}
-          </p>
         </header>
 
         <nav className="policy__toc" aria-label="On this page">
@@ -74,9 +69,9 @@ function RefundPolicy() {
           <section id="cancellation" aria-labelledby="cancellation-heading">
             <h2 id="cancellation-heading">Order cancellation</h2>
             <p>
-              This section will explain when an order can be cancelled and how to ask us. Exact cut-off times —
-              for example before packing or before dispatch — will be written here only after SV Hub approves
-              them.
+              You may ask us to cancel an order before it is packed or handed to a courier. Once an order has
+              been dispatched, cancellation is usually not possible — contact support and we will advise the
+              next step.
             </p>
             <Facts items={page.cancellation} />
           </section>
@@ -84,9 +79,9 @@ function RefundPolicy() {
           <section id="eligibility" aria-labelledby="eligibility-heading">
             <h2 id="eligibility-heading">Refund eligibility</h2>
             <p>
-              This section will list when a refund may be offered. Nothing below is a promise of eligibility.
-              Food, perishable items and handmade soaps may need different rules from other goods — those
-              distinctions will be confirmed by SV Hub.
+              Refunds may be offered when an order arrives damaged, incorrect, or incomplete, or when we cancel
+              an order we cannot fulfil. Food and perishable items are assessed case by case. Contact support
+              with your order number and photos where helpful.
             </p>
             <Facts items={page.eligibility} />
           </section>

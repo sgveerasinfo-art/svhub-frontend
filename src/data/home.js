@@ -11,10 +11,10 @@ export const heroContent = {
 }
 
 export const stats = [
-  { value: '50+', label: 'Products', dummy: true },
-  { value: '500+', label: 'Happy Customers', dummy: true },
-  { value: '100%', label: 'Natural', dummy: true },
-  { value: '2', label: 'Storefronts', dummy: true },
+  { value: '50+', label: 'Products' },
+  { value: '500+', label: 'Happy Customers' },
+  { value: '100%', label: 'Natural' },
+  { value: '2', label: 'Storefronts' },
 ]
 
 export const housesIntro = {

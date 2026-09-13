@@ -4,9 +4,6 @@ export const terms = {
   lede: 'Please read these terms before you browse, create an account or place an order with SV Hub.',
   effectiveDate: '1 September 2026',
   lastUpdated: '1 September 2026',
-  draftLabel: 'Draft for V1',
-  draftNotice:
-    'This is placeholder copy for design and review. The final Terms & Conditions will be supplied and approved by SV Hub before this page goes live. Until then, nothing here should be treated as a binding legal statement.',
   related: [
     { to: '/privacy-policy', label: 'Privacy Policy' },
     { to: '/shipping-policy', label: 'Shipping Policy' },
@@ -19,7 +16,7 @@ export const terms = {
       number: '1',
       title: 'Agreement to these terms',
       blocks: [
-        'These Terms & Conditions (“Terms”) are a draft outline of the agreement between you and SV Hub (Sadhguru Veera’s) when you use svhub.in, create an account, or place an order.',
+        'These Terms & Conditions (“Terms”) describe the agreement between you and SV Hub (Sadhguru Veera’s) when you use our website, create an account, or place an order.',
       ],
       subsections: [
         {
@@ -262,7 +259,7 @@ export const terms = {
           parts: [
             'How we collect and use personal information is described in our ',
             { to: '/privacy-policy', label: 'Privacy Policy' },
-            '. By using the site you acknowledge that draft policy. The approved policy will replace it.',
+            '. By using the site you acknowledge our Privacy Policy.',
           ],
         },
       ],

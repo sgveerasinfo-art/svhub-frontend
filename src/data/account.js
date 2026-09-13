@@ -1,5 +1,3 @@
-import { products } from './products.js'
-
 const ORDERS_KEY = 'svhub.account.orders'
 const ADDRESSES_KEY = 'svhub.account.addresses'
 const LAST_ORDER_KEY = 'svhub.lastOrder'
@@ -7,130 +5,6 @@ const LAST_ORDER_KEY = 'svhub.lastOrder'
 export const ORDER_STATUSES = ['Pending', 'Confirmed', 'Processing', 'Shipped', 'Out for Delivery', 'Delivered', 'Cancelled']
 export const ORDER_TIMELINE = ['Pending', 'Confirmed', 'Processing', 'Shipped', 'Out for Delivery', 'Delivered']
 export const PAYMENT_STATUSES = ['Pending', 'Paid', 'Failed', 'Refunded']
-
-const SAMPLE_ADDRESS = {
-  label: 'Home',
-  name: 'Priya Venkatesh',
-  phone: '+91 98765 43210',
-  lines: ['12 Heritage Lane, RS Puram', 'Coimbatore, Tamil Nadu', '641002'],
-}
-
-function productById(id) {
-  return products.find((product) => product.id === id)
-}
-
-function orderItem(productId, quantity = 1) {
-  const product = productById(productId)
-  if (!product) return null
-
-  return {
-    id: product.id,
-    slug: product.slug ?? product.id,
-    name: product.name,
-    weight: product.weight,
-    quantity,
-    price: product.price,
-    image: product.image,
-  }
-}
-
-function sampleAmount(items) {
-  return items.reduce((sum, item) => sum + item.price * (item.quantity || 1), 0)
-}
-
-function buildSampleOrders() {
-  const rows = [
-    {
-      number: '#SVH-98234',
-      date: '2026-08-18T10:00:00.000Z',
-      status: 'Delivered',
-      paymentStatus: 'Paid',
-      payment: 'Paid via Razorpay',
-      discount: 80,
-      ids: [
-        ['kullakar-rice', 2],
-        ['venthaya-thokku', 1],
-      ],
-    },
-    {
-      number: '#SVH-98110',
-      date: '2026-08-24T09:30:00.000Z',
-      status: 'Shipped',
-      paymentStatus: 'Paid',
-      payment: 'Paid via Razorpay',
-      ids: [
-        ['kasthuri-manjal-soap', 2],
-        ['vettiver-soap', 1],
-      ],
-    },
-    {
-      number: '#SVH-98002',
-      date: '2026-08-27T14:15:00.000Z',
-      status: 'Processing',
-      paymentStatus: 'Paid',
-      payment: 'Paid via Razorpay',
-      ids: [
-        ['tomato-thokku', 1],
-        ['garam-masala', 2],
-      ],
-    },
-    {
-      number: '#SVH-97888',
-      date: '2026-08-29T11:40:00.000Z',
-      status: 'Confirmed',
-      paymentStatus: 'Paid',
-      payment: 'Paid via Razorpay',
-      ids: [['mappillai-samba-rice', 1]],
-    },
-    {
-      number: '#SVH-97701',
-      date: '2026-08-31T08:20:00.000Z',
-      status: 'Pending',
-      paymentStatus: 'Pending',
-      payment: 'Payment pending',
-      shipping: 40,
-      ids: [
-        ['athirasam', 1],
-        ['mysore-pak', 1],
-      ],
-    },
-    {
-      number: '#SVH-96540',
-      date: '2026-08-12T16:05:00.000Z',
-      status: 'Cancelled',
-      paymentStatus: 'Refunded',
-      payment: 'Refunded to source',
-      ids: [['karuppu-kavuni-rice', 1]],
-    },
-  ]
-
-  return rows
-    .map((row) => {
-      const items = row.ids.map(([id, quantity]) => orderItem(id, quantity)).filter(Boolean)
-      if (!items.length) return null
-
-      const subtotal = sampleAmount(items)
-      const shipping = row.shipping ?? 0
-      const discount = row.discount ?? 0
-
-      return {
-        number: row.number,
-        date: row.date,
-        status: row.status,
-        paymentStatus: row.paymentStatus,
-        payment: row.payment,
-        items,
-        address: SAMPLE_ADDRESS,
-        subtotal,
-        shipping,
-        discount,
-        amount: Math.max(0, subtotal + shipping - discount),
-      }
-    })
-    .filter(Boolean)
-}
-
-const SAMPLE_ORDERS = buildSampleOrders()
 
 export function paymentStatusOf(raw) {
   if (raw?.paymentStatus && PAYMENT_STATUSES.includes(raw.paymentStatus)) {
@@ -274,10 +148,7 @@ export function getAccountOrders(user) {
       (last.email && user?.email && last.email.toLowerCase() === user.email.toLowerCase()))
   const extra = lastMatches && !recorded.some((order) => order.id === last.id) ? [last] : []
   const list = [...extra, ...recorded]
-  if (list.length) return list
-
-  return SAMPLE_ORDERS.map(normalizeOrder).filter(Boolean)
-}
+  return list
 
 export function getAccountOrder(orderId, user) {
   const id = String(orderId || '').toLowerCase()

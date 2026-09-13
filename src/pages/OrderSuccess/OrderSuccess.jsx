@@ -1,18 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { getOrder } from '../../api/orders.js'
-import { orderIdFromNumber } from '../../data/account.js'
 import { LOGO_ALT, LOGO_SRC } from '../../data/brand.js'
 import './OrderSuccess.css'
-
-const SAMPLE = {
-  orderNumber: '#SVH-98234',
-  date: '2024-10-24',
-  total: 2450,
-  city: 'Coimbatore, TN',
-  addressLines: ['123 Heritage Lane,', 'Coimbatore, Tamil Nadu,', '641001'],
-  payment: 'Paid via Razorpay',
-}
 
 function readStoredOrder() {
   try {
@@ -33,16 +23,31 @@ function formatMoney(value) {
 }
 
 function formatDate(value, month = 'long') {
-  const date = value ? new Date(value) : new Date()
-  if (Number.isNaN(date.getTime())) {
-    return SAMPLE.date
-  }
+  const date = value ? new Date(value) : null
+  if (!date || Number.isNaN(date.getTime())) return null
 
   return new Intl.DateTimeFormat('en-US', {
     month,
     day: 'numeric',
     year: 'numeric',
   }).format(date)
+}
+
+function paymentLabel(order) {
+  const status = String(order.paymentStatus || order.payment || '').toUpperCase()
+  if (status === 'PAID' || status === 'CAPTURED' || status.includes('PAID')) {
+    return 'Paid via Razorpay'
+  }
+  if (status === 'PENDING' || status === 'PENDING_PAYMENT' || status.includes('PENDING')) {
+    return 'Payment pending'
+  }
+  if (status === 'FAILED' || status.includes('FAIL')) {
+    return 'Payment failed'
+  }
+  if (order.payment && typeof order.payment === 'string' && !/sample|heritage|demo/i.test(order.payment)) {
+    return order.payment
+  }
+  return 'Payment status unavailable'
 }
 
 function IconCheck() {
@@ -140,56 +145,147 @@ function IconStar() {
   )
 }
 
+function buildOrderView({ state, stored, liveOrder }) {
+  if (liveOrder) {
+    const lines = liveOrder.shippingAddress?.lines
+    const city = liveOrder.shippingAddress?.city
+      ? `${liveOrder.shippingAddress.city}${liveOrder.shippingAddress.state ? `, ${liveOrder.shippingAddress.state}` : ''}`
+      : ''
+    return {
+      id: liveOrder.id,
+      orderNumber: liveOrder.orderNumber,
+      total: liveOrder.totalAmount,
+      date: liveOrder.createdAt,
+      city,
+      addressLines: Array.isArray(lines) ? lines : [],
+      paymentStatus: liveOrder.paymentStatus,
+      items: liveOrder.items || [],
+      source: 'api',
+    }
+  }
+
+  const candidate = { ...(stored || {}), ...(state || {}) }
+  const orderNumber = candidate.orderNumber || candidate.number
+  const total = candidate.total ?? candidate.totalAmount
+  const id = candidate.id || candidate.orderId
+  if (!orderNumber && total == null && !id) return null
+
+  return {
+    id,
+    orderNumber,
+    total,
+    date: candidate.date || candidate.createdAt,
+    city: candidate.city || '',
+    addressLines: Array.isArray(candidate.addressLines) ? candidate.addressLines : [],
+    paymentStatus: candidate.paymentStatus || candidate.payment,
+    payment: typeof candidate.payment === 'string' ? candidate.payment : undefined,
+    items: candidate.items || [],
+    source: state ? 'checkout' : 'session',
+  }
+}
+
 function OrderSuccess() {
   const location = useLocation()
   const state = location.state
   const [liveOrder, setLiveOrder] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [fetchFailed, setFetchFailed] = useState(false)
 
   const orderId = state?.orderId || new URLSearchParams(location.search).get('orderId')
+  const stored = readStoredOrder()
 
   useEffect(() => {
     document.title = 'Order Confirmed — SV Hub'
     window.scrollTo(0, 0)
 
-    if (orderId) {
-      getOrder(orderId)
-        .then((res) => {
-          if (res.data) setLiveOrder(res.data)
-        })
-        .catch(() => {})
+    if (!orderId) {
+      return () => {
+        document.title = 'SV Hub — Pure Native Goodness'
+      }
     }
 
+    let cancelled = false
+    setLoading(true)
+    setFetchFailed(false)
+    getOrder(orderId)
+      .then((res) => {
+        if (cancelled) return
+        if (res.data) setLiveOrder(res.data)
+        else setFetchFailed(true)
+      })
+      .catch(() => {
+        if (!cancelled) setFetchFailed(true)
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+
     return () => {
+      cancelled = true
       document.title = 'SV Hub — Pure Native Goodness'
     }
   }, [orderId])
 
-  const stored = readStoredOrder()
+  const order = buildOrderView({ state, stored, liveOrder })
+  const missing = !loading && !order
+  const unavailable = !loading && Boolean(orderId) && fetchFailed && !order
 
-  const order = {
-    ...SAMPLE,
-    ...(stored || {}),
-    ...(state || {}),
-    ...(liveOrder ? {
-      id: liveOrder.id,
-      orderNumber: liveOrder.orderNumber,
-      total: liveOrder.totalAmount,
-      date: liveOrder.createdAt,
-      city: liveOrder.shippingAddress?.city ? `${liveOrder.shippingAddress.city}, ${liveOrder.shippingAddress.state}` : SAMPLE.city,
-      addressLines: liveOrder.shippingAddress?.lines || SAMPLE.addressLines,
-      payment: `Paid via Razorpay (${liveOrder.paymentStatus})`,
-      items: liveOrder.items || [],
-    } : {}),
+  if (loading) {
+    return (
+      <section className="success">
+        <div className="success__inner">
+          <Link to="/" className="success__brand" aria-label="SV Hub home">
+            <img src={LOGO_SRC} alt={LOGO_ALT} width={1024} height={1024} decoding="async" />
+          </Link>
+          <article className="success__stage">
+            <header className="success__hero">
+              <h1 className="success__title">Loading order…</h1>
+              <p className="success__lede">Fetching your order details securely.</p>
+            </header>
+          </article>
+        </div>
+      </section>
+    )
   }
 
-  const orderNumber = order.orderNumber || SAMPLE.orderNumber
-  const canonicalOrderId = order.id || order.orderId || orderId || orderIdFromNumber(orderNumber)
-  const orderHref = `/account/orders/${canonicalOrderId}`
-  const total = formatMoney(order.total ?? SAMPLE.total)
-  const dateLong = formatDate(order.date, 'long')
-  const dateShort = formatDate(order.date, 'short')
-  const city = order.city || SAMPLE.city
-  const addressLines = order.addressLines || SAMPLE.addressLines
+  if (missing || unavailable) {
+    return (
+      <section className="success">
+        <div className="success__inner">
+          <Link to="/" className="success__brand" aria-label="SV Hub home">
+            <img src={LOGO_SRC} alt={LOGO_ALT} width={1024} height={1024} decoding="async" />
+          </Link>
+          <article className="success__stage">
+            <header className="success__hero">
+              <h1 className="success__title">Order not found</h1>
+              <p className="success__lede">
+                We could not find a confirmed order for this page. If you just checked out, open your
+                account orders or return to the shop.
+              </p>
+            </header>
+            <div className="success__actions">
+              <Link to="/account/orders" className="success__btn success__btn--solid">
+                View my orders
+              </Link>
+              <Link to="/shop" className="success__btn success__btn--ghost">
+                Continue shopping
+              </Link>
+            </div>
+          </article>
+        </div>
+      </section>
+    )
+  }
+
+  const orderNumber = order.orderNumber || '—'
+  const canonicalOrderId = order.id || orderId
+  const orderHref = canonicalOrderId ? `/account/orders/${canonicalOrderId}` : '/account/orders'
+  const total = order.total != null ? formatMoney(order.total) : '—'
+  const dateLong = formatDate(order.date, 'long') || '—'
+  const dateShort = formatDate(order.date, 'short') || '—'
+  const city = order.city || '—'
+  const addressLines = order.addressLines || []
+  const payment = paymentLabel(order)
 
   return (
     <section className="success">
@@ -245,7 +341,7 @@ function OrderSuccess() {
                 <dt>Payment Status</dt>
                 <dd>
                   <IconVerified />
-                  {order.payment || SAMPLE.payment}
+                  {payment}
                 </dd>
               </div>
               <div className="success__fact success__fact--ship">
@@ -261,17 +357,19 @@ function OrderSuccess() {
               </div>
             </dl>
 
-            <div className="success__address">
-              <h2>Delivery Address</h2>
-              <p>
-                {addressLines.map((line) => (
-                  <span key={line}>
-                    {line}
-                    <br />
-                  </span>
-                ))}
-              </p>
-            </div>
+            {addressLines.length ? (
+              <div className="success__address">
+                <h2>Delivery Address</h2>
+                <p>
+                  {addressLines.map((line) => (
+                    <span key={line}>
+                      {line}
+                      <br />
+                    </span>
+                  ))}
+                </p>
+              </div>
+            ) : null}
 
             {order.items && order.items.length > 0 ? (
               <div className="success__items">

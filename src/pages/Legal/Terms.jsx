@@ -70,11 +70,6 @@ function Terms() {
               <dd>{terms.lastUpdated}</dd>
             </div>
           </dl>
-
-          <p className="policy__draft" role="note">
-            <span>{terms.draftLabel}</span>
-            {terms.draftNotice}
-          </p>
         </header>
 
         <nav className="policy__toc" aria-label="On this page">

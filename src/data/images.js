@@ -1,4 +1,4 @@
-import heroFarm from '../assets/hero-farm.png'
+import heroFarm from '../assets/hero-farm.jpg'
 import authKitchen from '../assets/auth-kitchen.jpg'
 import nutriHero from '../assets/nutri-hero.jpg'
 import ganeshArt from '../assets/ganesh-chaturthi-art.webp'

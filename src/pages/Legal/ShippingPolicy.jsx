@@ -30,11 +30,7 @@ function ShippingPolicy() {
           <p className="policy__eyebrow">{page.eyebrow}</p>
           <h1 className="policy__title">{page.title}</h1>
           <p className="policy__lede">{page.lede}</p>
-          <p className="policy__draft" role="note">
-            <span>{page.draftLabel}</span>
-            {page.draftNotice}
-          </p>
-          <p className="policy__meta">Last updated: {page.lastUpdated} · Draft, not yet approved</p>
+          <p className="policy__meta">Last updated: {page.lastUpdated}</p>
         </header>
 
         <nav className="policy__toc" aria-label="On this page">
@@ -69,9 +65,8 @@ function ShippingPolicy() {
           <section id="processing" aria-labelledby="processing-heading">
             <h2 id="processing-heading">Order processing</h2>
             <p>
-              Food and self-care orders are packed with care, then handed to a courier. Product pages currently
-              mention that most orders leave within a few working days. That timing is indicative until this
-              policy is approved.
+              Food and self-care orders are packed with care, then handed to a courier. Most orders leave
+              within a few working days after confirmation.
             </p>
             <ol className="policy__steps">
               {page.steps.map((step) => (
@@ -99,8 +94,8 @@ function ShippingPolicy() {
               ))}
             </div>
             <p>
-              Dates shown in the shop are estimates, not a promise. The approved policy will set any guaranteed
-              windows, if SV Hub chooses to offer them.
+              Dates shown in the shop are estimates based on typical courier transit times for your pincode,
+              not a guaranteed delivery appointment.
             </p>
           </section>
 
@@ -151,8 +146,8 @@ function ShippingPolicy() {
               <Link to="/account/profile">Profile</Link>.
             </p>
             <p>
-              What we can offer if a parcel is lost or badly delayed will follow the approved{' '}
-              <Link to="/refund-policy">Refund Policy</Link> — we will not invent a compensation rule here.
+              If a parcel is lost or badly delayed, we will resolve it under our{' '}
+              <Link to="/refund-policy">Refund Policy</Link>.
             </p>
           </section>
 

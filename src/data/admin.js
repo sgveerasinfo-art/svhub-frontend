@@ -18,7 +18,7 @@ const CUSTOMERS = [
     id: 'cus-priya',
     name: 'Priya Venkatesh',
     email: 'priya.venkatesh@email.com',
-    phone: '+91 98765 43210',
+    phone: '+91 93463 99677',
     city: 'Coimbatore',
     state: 'Tamil Nadu',
     joined: '2026-03-12T09:00:00.000Z',
@@ -142,7 +142,7 @@ const ORDER_SEEDS = [
     ],
   },
   {
-    number: '#SVH-98234',
+    number: '#SVH-10001',
     date: '2026-08-18T10:00:00.000Z',
     status: 'Delivered',
     paymentStatus: 'Paid',

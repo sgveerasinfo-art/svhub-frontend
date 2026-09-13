@@ -169,8 +169,16 @@ function Shop() {
   const rangeEnd = rangeStart + shown.length - 1
   const activeCount = countActiveFilters(filters)
   const sortLabel = sortOptions.find((option) => option.id === filters.sort)?.label ?? 'Featured'
-  const countLabel = `${total} ${total === 1 ? 'product' : 'products'}`
-  const catalogMeta = `${total} products · ${storefronts.length} houses`
+  const countLabel = loading
+    ? 'Loading products…'
+    : loadError
+      ? 'Products unavailable'
+      : `${total} ${total === 1 ? 'product' : 'products'}`
+  const catalogMeta = loading
+    ? `Loading catalogue · ${storefronts.length} houses`
+    : loadError
+      ? `Catalogue unavailable · ${storefronts.length} houses`
+      : `${total} products · ${storefronts.length} houses`
   const pages = pagerPages(page, totalPages)
 
   const applyFilters = useCallback(

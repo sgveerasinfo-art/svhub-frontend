@@ -3,11 +3,6 @@ import { Link, useLocation } from 'react-router-dom'
 import { LOGO_ALT, LOGO_SRC } from '../../data/brand.js'
 import './PaymentFailed.css'
 
-const SAMPLE = {
-  reference: 'SVH-ORD-8821',
-  total: 2450,
-}
-
 function readStoredAttempt() {
   try {
     const raw = sessionStorage.getItem('svhub.lastPayment')
@@ -64,13 +59,12 @@ function PaymentFailed() {
   }, [])
 
   const attempt = {
-    ...SAMPLE,
     ...(stored || {}),
     ...(state || {}),
   }
 
-  const reference = attempt.reference || SAMPLE.reference
-  const amount = formatMoney(attempt.total ?? SAMPLE.total)
+  const reference = attempt.reference || attempt.orderNumber || '—'
+  const amount = attempt.total != null ? formatMoney(attempt.total) : '—'
 
   return (
     <section className="fail">
