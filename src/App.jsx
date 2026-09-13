@@ -13,7 +13,6 @@ import AdminProductNew from './pages/Admin/ProductNew.jsx'
 import AdminProductEdit from './pages/Admin/ProductEdit.jsx'
 import AdminInventory from './pages/Admin/Inventory.jsx'
 import AdminCategories from './pages/Admin/Categories.jsx'
-import AdminCoupons from './pages/Admin/Coupons.jsx'
 import AdminCustomers from './pages/Admin/Customers.jsx'
 import AdminSettings from './pages/Admin/Settings.jsx'
 import AdminLogin from './pages/Admin/Login.jsx'
@@ -72,7 +71,6 @@ function App() {
                   <Route path="products/:id/edit" element={<AdminProductEdit />} />
                   <Route path="inventory" element={<AdminInventory />} />
                   <Route path="categories" element={<AdminCategories />} />
-                  <Route path="coupons" element={<AdminCoupons />} />
                   <Route path="customers" element={<AdminCustomers />} />
                   <Route path="settings" element={<AdminSettings />} />
                   <Route element={<RequirePermission permission={PERMISSIONS.ACCESS_MANAGE} />}>
