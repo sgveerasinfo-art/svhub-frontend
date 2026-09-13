@@ -2,7 +2,7 @@ export const contact = {
   city: 'Coimbatore, Tamil Nadu',
   phoneDisplay: '+91 93463 99677',
   phoneTel: '+919346399677',
-  email: 'info@svhub.com',
+  email: 'sgveeras.info@gmail.com',
   whatsappUrl: 'https://wa.me/919346399677',
   mapsUrl: 'https://www.openstreetmap.org/?mlat=11.0168&mlon=76.9558#map=12/11.0168/76.9558',
   osmEmbed:

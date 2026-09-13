@@ -181,7 +181,7 @@ function PrivacyPolicy() {
             <h2 id="contact-heading">How to reach us</h2>
             <p>
               For privacy questions, write to{' '}
-              <a href="mailto:info@svhub.com">info@svhub.com</a> or use our{' '}
+              <a href="mailto:sgveeras.info@gmail.com">sgveeras.info@gmail.com</a> or use our{' '}
               <Link to="/contact">Contact</Link> page.
             </p>
             <p>SV Hub · Coimbatore, Tamil Nadu</p>

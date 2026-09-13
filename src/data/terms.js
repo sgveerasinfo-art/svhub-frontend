@@ -292,7 +292,7 @@ export const terms = {
         {
           parts: [
             'For questions about these Terms, write to ',
-            { href: 'mailto:info@svhub.com', label: 'info@svhub.com' },
+            { href: 'mailto:sgveeras.info@gmail.com', label: 'sgveeras.info@gmail.com' },
             ', call ',
             { href: 'tel:+919346399677', label: '+91 93463 99677' },
             ', or use our ',
