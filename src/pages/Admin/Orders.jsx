@@ -17,14 +17,7 @@ import { Icon } from '../../components/admin/icons.jsx'
 import { ErrorState, LoadingState, StatusBadge } from '../../components/admin/ui.jsx'
 import './Orders.css'
 
-const DATE_OPTIONS = [
-  { value: 'all', label: 'All time' },
-  { value: '7d', label: 'Last 7 days' },
-  { value: '30d', label: 'Last 30 days' },
-  { value: 'month', label: 'This month' },
-  { value: 'custom', label: 'Custom' },
-]
-
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const STATUS_FLOW = ['Pending', 'Confirmed', 'Processing', 'Shipped', 'Out for Delivery', 'Delivered']
 
 function formatExpectedDate(value) {
@@ -43,19 +36,88 @@ function startOfDay(value) {
   return date
 }
 
-function matchesDateFilter(iso, range, from, to) {
+function toDateKey(value) {
+  const date = startOfDay(value)
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function parseDateKey(key) {
+  if (!key || !/^\d{4}-\d{2}-\d{2}$/.test(key)) return null
+  const date = new Date(`${key}T00:00:00`)
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
+function sameDay(a, b) {
+  if (!a || !b) return false
+  return toDateKey(a) === toDateKey(b)
+}
+
+function buildMonthGrid(viewMonth) {
+  const year = viewMonth.getFullYear()
+  const month = viewMonth.getMonth()
+  const first = new Date(year, month, 1)
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+  const cells = []
+  for (let i = 0; i < first.getDay(); i += 1) cells.push(null)
+  for (let day = 1; day <= daysInMonth; day += 1) cells.push(new Date(year, month, day))
+  while (cells.length % 7 !== 0) cells.push(null)
+  return cells
+}
+
+function formatMonthLabel(value) {
+  return new Intl.DateTimeFormat('en-GB', { month: 'long', year: 'numeric' }).format(value)
+}
+
+function formatDayLabel(value) {
+  return new Intl.DateTimeFormat('en-GB', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  }).format(value)
+}
+
+function formatShortDayLabel(value) {
+  return new Intl.DateTimeFormat('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  }).format(value)
+}
+
+function formatRangeLabel(fromKey, toKey) {
+  const start = parseDateKey(fromKey)
+  const end = parseDateKey(toKey)
+  if (!start) return 'Select a day'
+  if (!end || fromKey === toKey) return formatDayLabel(start)
+  return `${formatShortDayLabel(start)} – ${formatShortDayLabel(end)}`
+}
+
+function normalizeRangeKeys(a, b) {
+  if (!a) return { from: b, to: b }
+  if (!b) return { from: a, to: a }
+  return a <= b ? { from: a, to: b } : { from: b, to: a }
+}
+
+function isKeyInRange(key, fromKey, toKey) {
+  if (!key || !fromKey || !toKey) return false
+  return key >= fromKey && key <= toKey
+}
+
+function matchesDayFilter(iso, dateMode, from, to) {
+  if (dateMode === 'all') return true
   const time = new Date(iso).getTime()
   if (Number.isNaN(time)) return false
-  const today = startOfDay(new Date())
-  if (range === '7d') return time >= today.getTime() - 6 * 86400000
-  if (range === '30d') return time >= today.getTime() - 29 * 86400000
-  if (range === 'month') return time >= new Date(today.getFullYear(), today.getMonth(), 1).getTime()
-  if (range === 'custom') {
-    const start = from ? new Date(`${from}T00:00:00`).getTime() : -Infinity
-    const end = to ? new Date(`${to}T23:59:59.999`).getTime() : Infinity
-    return time >= start && time <= end
-  }
-  return true
+  const start = from ? new Date(`${from}T00:00:00`).getTime() : -Infinity
+  const end = to ? new Date(`${to}T23:59:59.999`).getTime() : Infinity
+  return time >= start && time <= end
+}
+
+function orderAmount(order) {
+  return Number(order.amount ?? order.total ?? order.totalAmount ?? 0) || 0
 }
 
 function initials(name) {
@@ -588,15 +650,29 @@ function Orders() {
   const [selectedId, setSelectedId] = useState(null)
   const [menuId, setMenuId] = useState(null)
   const compact = useCompactOrders()
+  const todayKey = toDateKey(new Date())
   const query = params.get('q') || ''
   const status = params.get('status') || 'all'
   const payment = params.get('payment') || 'all'
-  const date = params.get('date') || 'all'
-  const from = params.get('from') || ''
-  const to = params.get('to') || ''
+  const dateMode = params.get('date') === 'all' ? 'all' : 'day'
+  const fromParam = params.get('from') || ''
+  const toParam = params.get('to') || ''
+  const range = dateMode === 'day'
+    ? normalizeRangeKeys(fromParam || todayKey, toParam || fromParam || todayKey)
+    : { from: '', to: '' }
+  const from = range.from
+  const to = range.to
+  const isRange = Boolean(from && to && from !== to)
   const coupon = (params.get('coupon') || '').trim().toUpperCase()
-  const filtersOn = Boolean(query || status !== 'all' || payment !== 'all' || date !== 'all' || from || to || coupon)
+  const filtersOn = Boolean(query || status !== 'all' || payment !== 'all' || coupon)
+  const rangeStart = dateMode === 'day' ? parseDateKey(from) : null
 
+  const [viewMonth, setViewMonth] = useState(() => {
+    const base = parseDateKey(fromParam) || new Date()
+    return new Date(base.getFullYear(), base.getMonth(), 1)
+  })
+  const [pickingEnd, setPickingEnd] = useState(false)
+  const [hoverKey, setHoverKey] = useState(null)
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(null)
@@ -621,30 +697,156 @@ function Orders() {
     fetchOrders()
   }, [fetchOrders])
 
+  useEffect(() => {
+    if (params.get('date') === 'all') return
+    const next = new URLSearchParams(params)
+    let changed = false
+    if (params.get('date') !== 'day') {
+      next.set('date', 'day')
+      changed = true
+    }
+    const fromKey = params.get('from') || todayKey
+    if (!params.get('from')) {
+      next.set('from', fromKey)
+      changed = true
+    }
+    if (!params.get('to')) {
+      next.set('to', next.get('from') || fromKey)
+      changed = true
+    } else {
+      const normalized = normalizeRangeKeys(next.get('from') || fromKey, next.get('to'))
+      if (next.get('from') !== normalized.from || next.get('to') !== normalized.to) {
+        next.set('from', normalized.from)
+        next.set('to', normalized.to)
+        changed = true
+      }
+    }
+    if (changed) setParams(next, { replace: true })
+  }, [params, setParams, todayKey])
+
+  useEffect(() => {
+    if (!rangeStart) return
+    setViewMonth((current) => {
+      if (current.getFullYear() === rangeStart.getFullYear() && current.getMonth() === rangeStart.getMonth()) {
+        return current
+      }
+      return new Date(rangeStart.getFullYear(), rangeStart.getMonth(), 1)
+    })
+  }, [rangeStart])
+
   function set(key, value) {
     const next = new URLSearchParams(params)
     if (!value || value === 'all') next.delete(key)
     else next.set(key, value)
-    if (key === 'date' && value !== 'custom') {
-      next.delete('from')
-      next.delete('to')
+    setParams(next)
+  }
+
+  function applyRange(fromKey, toKey, { continuePicking = false } = {}) {
+    const normalized = normalizeRangeKeys(fromKey, toKey)
+    const next = new URLSearchParams(params)
+    next.set('date', 'day')
+    next.set('from', normalized.from)
+    next.set('to', normalized.to)
+    setParams(next)
+    setPickingEnd(continuePicking)
+    setHoverKey(null)
+    const focus = parseDateKey(normalized.from)
+    if (focus) setViewMonth(new Date(focus.getFullYear(), focus.getMonth(), 1))
+  }
+
+  function selectDay(day) {
+    const key = toDateKey(day)
+    if (dateMode === 'all' || !pickingEnd) {
+      applyRange(key, key, { continuePicking: true })
+      return
+    }
+    applyRange(from || key, key, { continuePicking: false })
+  }
+
+  function showAllOrders() {
+    const next = new URLSearchParams(params)
+    next.set('date', 'all')
+    next.delete('from')
+    next.delete('to')
+    setParams(next)
+    setPickingEnd(false)
+    setHoverKey(null)
+  }
+
+  function clearFilters() {
+    const next = new URLSearchParams()
+    if (dateMode === 'day' && from && to) {
+      next.set('date', 'day')
+      next.set('from', from)
+      next.set('to', to)
+    } else if (dateMode === 'all') {
+      next.set('date', 'all')
     }
     setParams(next)
   }
 
-  function clearFilters() {
-    setParams(new URLSearchParams())
-  }
+  const previewRange = useMemo(() => {
+    if (dateMode !== 'day' || !from) return { from: '', to: '' }
+    if (pickingEnd && hoverKey) return normalizeRangeKeys(from, hoverKey)
+    return { from, to }
+  }, [dateMode, from, to, pickingEnd, hoverKey])
 
-  const stats = useMemo(
-    () => ({
-      total: orders.length,
-      pending: orders.filter((order) => order.status === 'Pending').length,
-      processing: orders.filter((order) => order.status === 'Processing').length,
-      issues: orders.filter((order) => order.paymentStatus === 'Failed').length,
-    }),
-    [orders],
-  )
+  const ordersByDay = useMemo(() => {
+    const map = new Map()
+    for (const order of orders) {
+      const key = toDateKey(order.date)
+      map.set(key, (map.get(key) || 0) + 1)
+    }
+    return map
+  }, [orders])
+
+  const periodOrders = useMemo(() => {
+    if (dateMode !== 'day' || !from || !to) return []
+    return orders.filter((order) => matchesDayFilter(order.date, 'day', from, to))
+  }, [orders, dateMode, from, to])
+
+  const dayStats = useMemo(() => {
+    const pending = periodOrders.filter((order) => order.status === 'Pending').length
+    const processing = periodOrders.filter((order) =>
+      ['Confirmed', 'Processing', 'Shipped', 'Out for Delivery'].includes(order.status),
+    ).length
+    const paid = periodOrders.filter((order) => order.paymentStatus === 'Paid').length
+    const issues = periodOrders.filter(
+      (order) => order.paymentStatus === 'Failed' || order.status === 'Cancelled',
+    ).length
+    const revenue = periodOrders.reduce((sum, order) => sum + orderAmount(order), 0)
+    return {
+      orders: periodOrders.length,
+      revenue,
+      pending,
+      processing,
+      paid,
+      issues,
+    }
+  }, [periodOrders])
+
+  const boardStats = useMemo(() => {
+    if (dateMode === 'day') return dayStats
+    const pending = orders.filter((order) => order.status === 'Pending').length
+    const processing = orders.filter((order) =>
+      ['Confirmed', 'Processing', 'Shipped', 'Out for Delivery'].includes(order.status),
+    ).length
+    const paid = orders.filter((order) => order.paymentStatus === 'Paid').length
+    const issues = orders.filter(
+      (order) => order.paymentStatus === 'Failed' || order.status === 'Cancelled',
+    ).length
+    const revenue = orders.reduce((sum, order) => sum + orderAmount(order), 0)
+    return {
+      orders: orders.length,
+      revenue,
+      pending,
+      processing,
+      paid,
+      issues,
+    }
+  }, [dateMode, dayStats, orders])
+
+  const monthCells = useMemo(() => buildMonthGrid(viewMonth), [viewMonth])
 
   const filtered = useMemo(() => {
     return [...orders]
@@ -652,23 +854,23 @@ function Orders() {
       .filter((order) => matchesQuery(query, order.number, order.customerName, order.email, order.phone))
       .filter((order) => (status === 'all' ? true : order.status === status))
       .filter((order) => (payment === 'all' ? true : order.paymentStatus === payment))
-      .filter((order) => matchesDateFilter(order.date, date, from, to))
+      .filter((order) => matchesDayFilter(order.date, dateMode, from, to))
       .filter((order) =>
         coupon
           ? String(order.coupon?.code || '').toUpperCase() === coupon
           : true,
       )
-  }, [orders, query, status, payment, date, from, to, coupon])
+  }, [orders, query, status, payment, dateMode, from, to, coupon])
 
   const paged = usePagedList(
     filtered,
     ADMIN_PAGE_SIZE,
-    `${query}|${status}|${payment}|${date}|${from}|${to}|${coupon}|${filtered.length}`,
+    `${query}|${status}|${payment}|${dateMode}|${from}|${to}|${coupon}|${filtered.length}`,
   )
 
   useEffect(() => {
     setMenuId(null)
-  }, [paged.page, query, status, payment, date, from, to, coupon])
+  }, [paged.page, query, status, payment, dateMode, from, to, coupon])
 
   function openOrder(order) {
     setSelectedId(order.id)
@@ -714,8 +916,21 @@ function Orders() {
   }
 
   const pages = pageList(paged.page, paged.pageCount)
-  const emptyTitle = orders.length ? 'No orders match' : 'No orders yet'
-  const emptyCopy = orders.length ? 'Try another search or clear a filter.' : 'Orders will appear here as customers check out.'
+  const emptyTitle =
+    orders.length && dateMode === 'day'
+      ? isRange
+        ? 'No orders in this range'
+        : 'No orders on this day'
+      : orders.length
+        ? 'No orders match'
+        : 'No orders yet'
+  const emptyCopy =
+    orders.length && dateMode === 'day'
+      ? 'Pick another day or range on the calendar, or show all orders.'
+      : orders.length
+        ? 'Try another search or clear a filter.'
+        : 'Orders will appear here as customers check out.'
+  const todaySelected = dateMode === 'day' && from === todayKey && to === todayKey
 
   return (
     <div className="admin-orders">
@@ -727,39 +942,164 @@ function Orders() {
         </div>
       </header>
 
-      <section className="admin-orders__stats" aria-label="Order summary">
-        <button
-          type="button"
-          className={`admin-orders__stat${!filtersOn ? ' is-on' : ''}`}
-          onClick={clearFilters}
-        >
-          <strong>{stats.total}</strong>
-          <span>Total orders</span>
-        </button>
-        <button
-          type="button"
-          className={`admin-orders__stat${status === 'Pending' ? ' is-on' : ''}`}
-          onClick={() => set('status', status === 'Pending' ? 'all' : 'Pending')}
-        >
-          <strong>{stats.pending}</strong>
-          <span>Pending</span>
-        </button>
-        <button
-          type="button"
-          className={`admin-orders__stat${status === 'Processing' ? ' is-on' : ''}`}
-          onClick={() => set('status', status === 'Processing' ? 'all' : 'Processing')}
-        >
-          <strong>{stats.processing}</strong>
-          <span>Processing</span>
-        </button>
-        <button
-          type="button"
-          className={`admin-orders__stat admin-orders__stat--alert${payment === 'Failed' ? ' is-on' : ''}`}
-          onClick={() => set('payment', payment === 'Failed' ? 'all' : 'Failed')}
-        >
-          <strong>{stats.issues}</strong>
-          <span>Issues</span>
-        </button>
+      <section className="admin-orders__board" aria-label="Orders calendar and day overview">
+        <div className="admin-orders__calendar">
+          <div className="admin-orders__cal-head">
+            <button
+              type="button"
+              className="admin-orders__cal-nav"
+              onClick={() =>
+                setViewMonth((current) => new Date(current.getFullYear(), current.getMonth() - 1, 1))
+              }
+              aria-label="Previous month"
+            >
+              ←
+            </button>
+            <h2>{formatMonthLabel(viewMonth)}</h2>
+            <button
+              type="button"
+              className="admin-orders__cal-nav"
+              onClick={() =>
+                setViewMonth((current) => new Date(current.getFullYear(), current.getMonth() + 1, 1))
+              }
+              aria-label="Next month"
+            >
+              →
+            </button>
+          </div>
+          <div className="admin-orders__cal-weekdays" aria-hidden="true">
+            {WEEKDAYS.map((day) => (
+              <span key={day}>{day}</span>
+            ))}
+          </div>
+          <div
+            className="admin-orders__cal-grid"
+            role="grid"
+            aria-label={formatMonthLabel(viewMonth)}
+            onMouseLeave={() => setHoverKey(null)}
+          >
+            {monthCells.map((day, index) => {
+              if (!day) {
+                return <span key={`empty-${index}`} className="admin-orders__cal-cell is-empty" />
+              }
+              const key = toDateKey(day)
+              const count = ordersByDay.get(key) || 0
+              const inPreview = dateMode === 'day' && isKeyInRange(key, previewRange.from, previewRange.to)
+              const isStart = dateMode === 'day' && key === previewRange.from
+              const isEnd = dateMode === 'day' && key === previewRange.to
+              const isToday = sameDay(day, new Date())
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  role="gridcell"
+                  className={[
+                    'admin-orders__cal-cell',
+                    inPreview ? 'is-in-range' : '',
+                    isStart ? 'is-range-start' : '',
+                    isEnd ? 'is-range-end' : '',
+                    isStart && isEnd ? 'is-selected' : '',
+                    isToday ? 'is-today' : '',
+                    count ? 'has-orders' : '',
+                    pickingEnd && key === from ? 'is-picking' : '',
+                  ]
+                    .filter(Boolean)
+                    .join(' ')}
+                  onClick={() => selectDay(day)}
+                  onMouseEnter={() => {
+                    if (pickingEnd) setHoverKey(key)
+                  }}
+                  aria-label={`${formatDayLabel(day)}${count ? `, ${count} orders` : ''}`}
+                  aria-pressed={inPreview}
+                >
+                  <span className="admin-orders__cal-day">{day.getDate()}</span>
+                  {count ? <span className="admin-orders__cal-dot" aria-hidden="true" /> : null}
+                </button>
+              )
+            })}
+          </div>
+          <div className="admin-orders__cal-foot">
+            <button
+              type="button"
+              className={`admin-orders__all-btn${dateMode === 'all' ? ' is-on' : ''}`}
+              onClick={showAllOrders}
+            >
+              All orders
+            </button>
+            {!todaySelected ? (
+              <button
+                type="button"
+                className="admin-orders__today-btn"
+                onClick={() => applyRange(todayKey, todayKey, { continuePicking: true })}
+              >
+                Today
+              </button>
+            ) : null}
+            <p className="admin-orders__cal-hint">
+              {pickingEnd
+                ? 'Tap another day to set the end of the range.'
+                : 'Tap a day, then another to select a range.'}
+            </p>
+          </div>
+        </div>
+
+        <div className="admin-orders__daypane">
+          <div className="admin-orders__daypane-head">
+            <p className="admin-orders__eyebrow">{isRange ? 'Range overview' : 'Day overview'}</p>
+            <h2>
+              {dateMode === 'all'
+                ? 'All orders'
+                : formatRangeLabel(from, to)}
+            </h2>
+            <p className="admin-orders__daypane-copy">
+              {dateMode === 'all'
+                ? 'Showing the full order list. Pick a day on the calendar to focus the table.'
+                : pickingEnd
+                  ? 'Start date set — choose an end date, or leave it as a single day.'
+                  : isRange
+                    ? 'Metrics and table below are scoped to this date range.'
+                    : 'Metrics and table below are scoped to this day.'}
+            </p>
+          </div>
+          <div className="admin-orders__daycards" aria-label="Selected period metrics">
+            <div className="admin-orders__daycard">
+              <strong>{boardStats.orders}</strong>
+              <span>Orders</span>
+            </div>
+            <div className="admin-orders__daycard">
+              <strong>{formatPrice(boardStats.revenue)}</strong>
+              <span>Revenue</span>
+            </div>
+            <button
+              type="button"
+              className={`admin-orders__daycard${status === 'Pending' ? ' is-on' : ''}`}
+              onClick={() => set('status', status === 'Pending' ? 'all' : 'Pending')}
+            >
+              <strong>{boardStats.pending}</strong>
+              <span>Pending</span>
+            </button>
+            <button
+              type="button"
+              className={`admin-orders__daycard${status === 'Processing' ? ' is-on' : ''}`}
+              onClick={() => set('status', status === 'Processing' ? 'all' : 'Processing')}
+            >
+              <strong>{boardStats.processing}</strong>
+              <span>In fulfillment</span>
+            </button>
+            <div className="admin-orders__daycard">
+              <strong>{boardStats.paid}</strong>
+              <span>Paid</span>
+            </div>
+            <button
+              type="button"
+              className={`admin-orders__daycard admin-orders__daycard--alert${payment === 'Failed' || status === 'Cancelled' ? ' is-on' : ''}`}
+              onClick={() => set('payment', payment === 'Failed' ? 'all' : 'Failed')}
+            >
+              <strong>{boardStats.issues}</strong>
+              <span>Issues</span>
+            </button>
+          </div>
+        </div>
       </section>
 
       <div className="admin-orders__toolbar">
@@ -780,28 +1120,6 @@ function Orders() {
             aria-label="Filter by coupon code"
           />
         </label>
-        <label className="admin-orders__select">
-          <span>Date</span>
-          <select value={date} onChange={(event) => set('date', event.target.value)}>
-            {DATE_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        {date === 'custom' ? (
-          <>
-            <label className="admin-orders__select admin-orders__select--date">
-              <span>From</span>
-              <input type="date" value={from} onChange={(event) => set('from', event.target.value)} />
-            </label>
-            <label className="admin-orders__select admin-orders__select--date">
-              <span>To</span>
-              <input type="date" value={to} onChange={(event) => set('to', event.target.value)} />
-            </label>
-          </>
-        ) : null}
         <label className="admin-orders__select">
           <span>Payment</span>
           <select value={payment} onChange={(event) => set('payment', event.target.value)}>

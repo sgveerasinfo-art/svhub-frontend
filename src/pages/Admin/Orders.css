@@ -53,59 +53,285 @@
   font-size: 14px;
 }
 
-.admin-orders__stats {
+.admin-orders__board {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0;
-  margin-bottom: 20px;
+  grid-template-columns: minmax(0, 0.42fr) minmax(0, 0.58fr);
+  gap: 20px 28px;
+  align-items: start;
+  margin-bottom: 24px;
+  padding: 18px 0 8px;
   border-top: 1px solid var(--ord-line);
   border-bottom: 1px solid var(--ord-line);
 }
 
-.admin-orders__stat {
-  padding: 14px 0 12px;
+.admin-orders__calendar {
+  min-width: 0;
+}
+
+.admin-orders__cal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.admin-orders__cal-head h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--ord-ink);
+  text-align: center;
+}
+
+.admin-orders__cal-nav {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--ord-line);
+  border-radius: 8px;
+  background: var(--ord-surface);
+  color: var(--ord-green);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color 160ms ease, border-color 160ms ease;
+}
+
+.admin-orders__cal-nav:hover {
+  background: #faf8f3;
+  border-color: rgba(110, 140, 40, 0.35);
+}
+
+.admin-orders__cal-weekdays,
+.admin-orders__cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.admin-orders__cal-weekdays {
+  margin-bottom: 6px;
+}
+
+.admin-orders__cal-weekdays span {
+  color: var(--ord-mute);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.admin-orders__cal-cell {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 4px 2px 8px;
   border: 0;
-  border-right: 1px solid var(--ord-line);
+  border-radius: 10px;
   background: transparent;
+  color: var(--ord-ink);
+  cursor: pointer;
+  transition: background-color 160ms ease, color 160ms ease;
+}
+
+.admin-orders__cal-cell.is-empty {
+  pointer-events: none;
+  min-height: 40px;
+}
+
+.admin-orders__cal-cell:hover:not(.is-empty) {
+  background: rgba(59, 70, 50, 0.05);
+}
+
+.admin-orders__cal-cell.is-today .admin-orders__cal-day {
+  color: var(--ord-leaf);
+  font-weight: 700;
+}
+
+.admin-orders__cal-cell.is-in-range {
+  background: rgba(110, 140, 40, 0.1);
+  border-radius: 0;
+}
+
+.admin-orders__cal-cell.is-range-start {
+  border-radius: 10px 0 0 10px;
+}
+
+.admin-orders__cal-cell.is-range-end {
+  border-radius: 0 10px 10px 0;
+}
+
+.admin-orders__cal-cell.is-range-start.is-range-end,
+.admin-orders__cal-cell.is-selected {
+  border-radius: 10px;
+  background: rgba(110, 140, 40, 0.16);
+  box-shadow: inset 0 0 0 1px rgba(110, 140, 40, 0.4);
+}
+
+.admin-orders__cal-cell.is-range-start:not(.is-range-end),
+.admin-orders__cal-cell.is-range-end:not(.is-range-start) {
+  background: rgba(110, 140, 40, 0.18);
+  box-shadow: inset 0 0 0 1px rgba(110, 140, 40, 0.35);
+}
+
+.admin-orders__cal-cell.is-picking {
+  box-shadow: inset 0 0 0 1.5px var(--ord-olive);
+}
+
+.admin-orders__cal-day {
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+.admin-orders__cal-dot {
+  position: absolute;
+  bottom: 5px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--ord-olive);
+}
+
+.admin-orders__cal-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.admin-orders__cal-hint {
+  flex: 1 1 100%;
+  margin: 2px 0 0;
+  color: var(--ord-mute);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.admin-orders__all-btn,
+.admin-orders__today-btn {
+  padding: 6px 10px;
+  border: 1px solid var(--ord-line);
+  border-radius: 8px;
+  background: var(--ord-surface);
+  color: var(--ord-leaf);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 160ms ease, border-color 160ms ease;
+}
+
+.admin-orders__all-btn:hover,
+.admin-orders__today-btn:hover,
+.admin-orders__all-btn.is-on {
+  border-color: rgba(110, 140, 40, 0.4);
+  background: rgba(110, 140, 40, 0.08);
+}
+
+.admin-orders__today-btn {
+  border-color: transparent;
+  background: transparent;
+}
+
+.admin-orders__daypane {
+  min-width: 0;
+  padding-top: 2px;
+}
+
+.admin-orders__daypane-head h2 {
+  margin: 0;
+  font-size: clamp(18px, 1.8vw, 22px);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--ord-ink);
+}
+
+.admin-orders__daypane-copy {
+  max-width: 42ch;
+  margin: 6px 0 0;
+  color: var(--ord-mute);
+  font-size: 13px;
+}
+
+.admin-orders__daycards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.admin-orders__daycard {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-height: 64px;
+  padding: 12px 14px;
+  border: 1px solid var(--ord-line);
+  border-radius: 12px;
+  background: var(--ord-surface);
   color: inherit;
   text-align: left;
+  cursor: default;
+  transition: background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+
+button.admin-orders__daycard {
   cursor: pointer;
-  transition: background-color 160ms ease;
 }
 
-.admin-orders__stat:last-child {
-  border-right: 0;
+button.admin-orders__daycard:hover,
+.admin-orders__daycard.is-on {
+  background: #faf8f3;
+  border-color: rgba(110, 140, 40, 0.35);
 }
 
-.admin-orders__stat:hover,
-.admin-orders__stat.is-on {
-  background: rgba(59, 70, 50, 0.035);
-}
-
-.admin-orders__stat.is-on {
+.admin-orders__daycard.is-on {
   box-shadow: inset 0 -2px 0 var(--ord-olive);
 }
 
-.admin-orders__stat strong {
-  display: block;
-  font-size: 22px;
+.admin-orders__daycard strong {
+  font-size: 18px;
   font-weight: 600;
   letter-spacing: -0.03em;
   font-variant-numeric: tabular-nums;
   color: var(--ord-ink);
+  line-height: 1.2;
 }
 
-.admin-orders__stat span {
-  display: block;
-  margin-top: 2px;
+.admin-orders__daycard span {
   color: var(--ord-mute);
-  font-size: 11px;
+  font-size: 10px;
+  font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
-.admin-orders__stat--alert strong {
+.admin-orders__daycard--alert strong {
   color: var(--ord-terra);
+}
+
+@media (max-width: 900px) {
+  .admin-orders__board {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+}
+
+@media (max-width: 560px) {
+  .admin-orders__daycards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-orders__cal-cell {
+    min-height: 36px;
+  }
 }
 
 .admin-orders__toolbar {
@@ -1082,20 +1308,6 @@
   }
 }
 
-@media (max-width: 900px) {
-  .admin-orders__stats {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .admin-orders__stat:nth-child(2n) {
-    border-right: 0;
-  }
-
-  .admin-orders__stat:nth-child(n + 3) {
-    border-top: 1px solid var(--ord-line);
-  }
-}
-
 @media (max-width: 720px) {
   .admin-orders__do {
     opacity: 1;
@@ -1122,18 +1334,6 @@
   .admin-orders__head {
     gap: 10px;
     margin-bottom: 16px;
-  }
-
-  .admin-orders__stat {
-    padding: 10px 8px;
-  }
-
-  .admin-orders__stat strong {
-    font-size: 18px;
-  }
-
-  .admin-orders__stat span {
-    font-size: 11px;
   }
 
   .admin-orders-dialog__panel {
