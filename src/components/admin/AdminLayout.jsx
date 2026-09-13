@@ -14,6 +14,7 @@ const MAIN_NAV = [
   { to: '/admin', label: 'Dashboard', icon: 'dashboard', end: true },
   { to: '/admin/products', label: 'Products', icon: 'products' },
   { to: '/admin/categories', label: 'Categories', icon: 'categories' },
+  { to: '/admin/coupons', label: 'Coupons', icon: 'categories' },
   { to: '/admin/orders', label: 'Orders', icon: 'orders' },
   { to: '/admin/customers', label: 'Customers', icon: 'customers' },
 ]

@@ -1,4 +1,4 @@
-import { getHealth } from './client.js'
+import { getHealth, notifyIfSessionInvalid } from './client.js'
 
 const API_URL = import.meta.env.VITE_API_URL || '/api'
 const SESSION_KEY = 'svhub.auth.session'
@@ -37,9 +37,9 @@ async function request(path, { method = 'POST', body, auth = false } = {}) {
     throw new AuthError('network', 'We couldn’t reach SV Hub. Check your connection and try again.')
   }
 
+  const token = auth ? readToken() : ''
   let response
   try {
-    const token = auth ? readToken() : ''
     response = await fetch(`${API_URL}${path}`, {
       method,
       headers: {
@@ -56,7 +56,9 @@ async function request(path, { method = 'POST', body, auth = false } = {}) {
   const data = await response.json().catch(() => ({}))
 
   if (!response.ok) {
-    throw new AuthError(data.code || 'server', data.message || 'Something went wrong. Please try again.')
+    const code = data.code || 'server'
+    notifyIfSessionInvalid(response.status, code, { hadToken: Boolean(token) })
+    throw new AuthError(code, data.message || 'Something went wrong. Please try again.')
   }
 
   return data

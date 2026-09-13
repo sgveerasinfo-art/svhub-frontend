@@ -1,6 +1,4 @@
-import { readToken } from './auth.js'
-
-const API_URL = import.meta.env.VITE_API_URL || '/api'
+import { apiFetch } from './client.js'
 
 export class AdminCustomerApiError extends Error {
   constructor(code, message, status) {
@@ -12,48 +10,15 @@ export class AdminCustomerApiError extends Error {
 }
 
 async function adminRequest(path, { method = 'GET', body, query } = {}) {
-  let queryString = ''
-  if (query && typeof query === 'object') {
-    const searchParams = new URLSearchParams()
-    for (const [key, value] of Object.entries(query)) {
-      if (value !== undefined && value !== null && value !== '' && value !== 'all') {
-        searchParams.set(key, String(value))
-      }
-    }
-    const qs = searchParams.toString()
-    if (qs) queryString = `?${qs}`
-  }
-
-  const token = readToken()
-  const headers = {
-    Accept: 'application/json',
-    ...(body ? { 'Content-Type': 'application/json' } : {}),
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  }
-
-  let response
   try {
-    response = await fetch(`${API_URL}${path}${queryString}`, {
-      method,
-      headers,
-      body: body ? JSON.stringify(body) : undefined,
-    })
-  } catch {
-    throw new AdminCustomerApiError('network', 'Could not connect to the SV Hub server.', 0)
-  }
-
-  const data = await response.json().catch(() => ({}))
-
-  if (!response.ok) {
-    const errorObj = data.error || data
+    return await apiFetch(path, { method, body, query, auth: true })
+  } catch (error) {
     throw new AdminCustomerApiError(
-      errorObj.code || `http_${response.status}`,
-      errorObj.message || 'Request failed.',
-      response.status,
+      error.code || 'server_error',
+      error.message || 'Request failed.',
+      error.status || 0,
     )
   }
-
-  return data
 }
 
 /**

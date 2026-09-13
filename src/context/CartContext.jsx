@@ -16,15 +16,28 @@ import {
 const CartContext = createContext(null)
 
 function cartFromBackend(data) {
-  if (!data) return { items: [], count: 0, subtotal: 0 }
+  if (!data) {
+    return {
+      items: [],
+      count: 0,
+      subtotal: 0,
+      appliedCoupon: null,
+      appliedCouponCode: null,
+      couponMessage: null,
+    }
+  }
   return {
     items: Array.isArray(data.items) ? data.items : [],
     count: data.count ?? 0,
     subtotal: data.subtotal ?? 0,
+    appliedCoupon: data.appliedCoupon || null,
+    appliedCouponCode: data.appliedCouponCode || data.appliedCoupon?.code || null,
+    couponMessage: data.couponMessage || null,
   }
 }
 
 const GUEST_CART_KEY = 'svhub.cart.guest'
+const GUEST_COUPON_KEY = 'svhub.cart.guestCoupon'
 
 function readGuestCart() {
   try {
@@ -45,6 +58,28 @@ function writeGuestCart(cartItems) {
     }
   } catch {
     /* ignore storage errors */
+  }
+}
+
+function readGuestCouponCode() {
+  try {
+    return String(window.localStorage.getItem(GUEST_COUPON_KEY) || '')
+      .trim()
+      .toUpperCase()
+  } catch {
+    return ''
+  }
+}
+
+function writeGuestCouponCode(code) {
+  try {
+    const normalized = String(code || '')
+      .trim()
+      .toUpperCase()
+    if (normalized) window.localStorage.setItem(GUEST_COUPON_KEY, normalized)
+    else window.localStorage.removeItem(GUEST_COUPON_KEY)
+  } catch {
+    /* ignore */
   }
 }
 
@@ -72,6 +107,8 @@ export function CartProvider({ children }) {
     return []
   })
   const [subtotal, setSubtotal] = useState(0)
+  const [appliedCoupon, setAppliedCoupon] = useState(null)
+  const [couponMessage, setCouponMessage] = useState('')
   const [loading, setLoading] = useState(() => Boolean(readToken() && user))
   const [cartError, setCartError] = useState('')
 
@@ -80,10 +117,14 @@ export function CartProvider({ children }) {
   const isLoggedIn = useCallback(() => Boolean(readToken() && user), [user])
 
   const applyServerCart = useCallback((res) => {
-    const { items: backendItems, subtotal: total } = cartFromBackend(res?.data)
-    itemsRef.current = backendItems
-    setItems(backendItems)
-    setSubtotal(total)
+    const parsed = cartFromBackend(res?.data)
+    itemsRef.current = parsed.items
+    setItems(parsed.items)
+    setSubtotal(parsed.subtotal)
+    setAppliedCoupon(parsed.appliedCoupon)
+    if (parsed.couponMessage) setCouponMessage(parsed.couponMessage)
+    else setCouponMessage('')
+    if (parsed.appliedCouponCode) writeGuestCouponCode('')
   }, [])
 
   const applyOptimisticItems = useCallback((nextItems) => {
@@ -115,11 +156,14 @@ export function CartProvider({ children }) {
       onSuccess: (res) => {
         // Preserve newer optimistic quantities for lines still pending sync.
         const queue = qtyQueueRef.current
-        const { items: backendItems, subtotal: total } = cartFromBackend(res?.data)
+        const parsed = cartFromBackend(res?.data)
+        const backendItems = parsed.items
+        const total = parsed.subtotal
         if (!queue || queue.pendingCount() === 0) {
           itemsRef.current = backendItems
           setItems(backendItems)
           setSubtotal(total)
+          setAppliedCoupon(parsed.appliedCoupon)
           setCartError('')
           return
         }
@@ -135,6 +179,7 @@ export function CartProvider({ children }) {
         itemsRef.current = merged
         setItems(merged)
         setSubtotal(computeCartSubtotal(merged))
+        setAppliedCoupon(parsed.appliedCoupon)
         setCartError('')
       },
       onError: async (error) => {
@@ -152,8 +197,22 @@ export function CartProvider({ children }) {
   const mergeGuestCart = useCallback(
     async (guestItems) => {
       const itemsToMerge = guestItems?.length ? guestItems : readGuestCart()
+      const guestCoupon = readGuestCouponCode()
       if (!itemsToMerge?.length) {
         await syncCart()
+        if (guestCoupon && isLoggedIn()) {
+          try {
+            const couponRes = await cartApi.applyCartCoupon(guestCoupon)
+            writeGuestCouponCode('')
+            applyServerCart(couponRes)
+            if (couponRes?.meta?.replaced) {
+              setCouponMessage('Replaced previous coupon')
+            }
+          } catch (error) {
+            writeGuestCouponCode('')
+            setCouponMessage(error?.message || 'Saved coupon could not be applied.')
+          }
+        }
         return
       }
 
@@ -175,12 +234,23 @@ export function CartProvider({ children }) {
         const res = await cartApi.mergeCart(mappable)
         writeGuestCart([])
         applyServerCart(res)
+        if (guestCoupon) {
+          try {
+            const couponRes = await cartApi.applyCartCoupon(guestCoupon)
+            writeGuestCouponCode('')
+            applyServerCart(couponRes)
+            if (couponRes?.meta?.replaced) setCouponMessage('Replaced previous coupon')
+          } catch (error) {
+            writeGuestCouponCode('')
+            setCouponMessage(error?.message || 'Saved coupon could not be applied.')
+          }
+        }
       } catch {
         writeGuestCart([])
         await syncCart()
       }
     },
-    [syncCart, applyServerCart],
+    [syncCart, applyServerCart, isLoggedIn],
   )
 
   useEffect(() => {
@@ -203,6 +273,8 @@ export function CartProvider({ children }) {
       itemsRef.current = []
       setItems([])
       setSubtotal(0)
+      setAppliedCoupon(null)
+      setCouponMessage('')
       setCartError('')
     } else if (user) {
       syncCart()
@@ -216,7 +288,60 @@ export function CartProvider({ children }) {
     return computeCartSubtotal(items)
   }, [isLoggedIn, subtotal, items])
 
+  const discountAmount = appliedCoupon?.discountAmount || 0
+  const discountedSubtotal = Math.max(0, effectiveSubtotal - discountAmount)
+
   const clearCartError = useCallback(() => setCartError(''), [])
+
+  const applyCoupon = useCallback(
+    async (rawCode) => {
+      const code = String(rawCode || '')
+        .trim()
+        .toUpperCase()
+      setCouponMessage('')
+      if (!code) {
+        setCouponMessage('Enter a coupon code.')
+        throw new Error('Enter a coupon code.')
+      }
+
+      if (!isLoggedIn()) {
+        writeGuestCouponCode(code)
+        setAppliedCoupon({ code, discountAmount: 0, pending: true })
+        setCouponMessage('Coupon saved. Sign in to apply it to your cart.')
+        return { pending: true, code }
+      }
+
+      try {
+        const res = await cartApi.applyCartCoupon(code)
+        applyServerCart(res)
+        const message = res?.meta?.replaced
+          ? 'Replaced previous coupon'
+          : res?.meta?.message || res?.data?.appliedCoupon?.message || `Coupon ${code} applied`
+        setCouponMessage(message)
+        return res
+      } catch (error) {
+        setCouponMessage(error?.message || 'Could not apply coupon.')
+        throw error
+      }
+    },
+    [isLoggedIn, applyServerCart],
+  )
+
+  const removeCoupon = useCallback(async () => {
+    setCouponMessage('')
+    writeGuestCouponCode('')
+    if (!isLoggedIn()) {
+      setAppliedCoupon(null)
+      return
+    }
+    try {
+      const res = await cartApi.removeCartCoupon()
+      applyServerCart(res)
+    } catch (error) {
+      setCouponMessage(error?.message || 'Could not remove coupon.')
+      throw error
+    }
+  }, [isLoggedIn, applyServerCart])
 
   const addItem = useCallback(
     async (product, quantity = 1) => {
@@ -377,12 +502,15 @@ export function CartProvider({ children }) {
   const clearCart = useCallback(async () => {
     const snapshot = itemsRef.current
     const snapshotSubtotal = subtotal
+    const snapshotCoupon = appliedCoupon
     qtyQueueRef.current?.clear()
     pendingAddsRef.current.clear()
     itemsRef.current = []
     setItems([])
     setSubtotal(0)
+    setAppliedCoupon(null)
     writeGuestCart([])
+    writeGuestCouponCode('')
     setCartError('')
     if (!isLoggedIn()) return
     try {
@@ -392,14 +520,19 @@ export function CartProvider({ children }) {
       itemsRef.current = snapshot
       setItems(snapshot)
       setSubtotal(snapshotSubtotal)
+      setAppliedCoupon(snapshotCoupon)
     }
-  }, [isLoggedIn, subtotal])
+  }, [isLoggedIn, subtotal, appliedCoupon])
 
   const value = useMemo(
     () => ({
       items,
       count,
       subtotal: effectiveSubtotal,
+      discountedSubtotal,
+      discountAmount,
+      appliedCoupon,
+      couponMessage,
       loading,
       cartError,
       clearCartError,
@@ -410,11 +543,17 @@ export function CartProvider({ children }) {
       clearCart,
       syncCart,
       mergeGuestCart,
+      applyCoupon,
+      removeCoupon,
     }),
     [
       items,
       count,
       effectiveSubtotal,
+      discountedSubtotal,
+      discountAmount,
+      appliedCoupon,
+      couponMessage,
       loading,
       cartError,
       clearCartError,
@@ -425,6 +564,8 @@ export function CartProvider({ children }) {
       clearCart,
       syncCart,
       mergeGuestCart,
+      applyCoupon,
+      removeCoupon,
     ],
   )
 

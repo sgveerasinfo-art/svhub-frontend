@@ -594,7 +594,8 @@ function Orders() {
   const date = params.get('date') || 'all'
   const from = params.get('from') || ''
   const to = params.get('to') || ''
-  const filtersOn = Boolean(query || status !== 'all' || payment !== 'all' || date !== 'all' || from || to)
+  const coupon = (params.get('coupon') || '').trim().toUpperCase()
+  const filtersOn = Boolean(query || status !== 'all' || payment !== 'all' || date !== 'all' || from || to || coupon)
 
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
@@ -604,14 +605,17 @@ function Orders() {
     try {
       setLoading(true)
       setLoadError(null)
-      const res = await getAdminOrders({ limit: 100 })
+      const res = await getAdminOrders({
+        limit: 100,
+        ...(coupon ? { couponCode: coupon } : {}),
+      })
       setOrders(res.orders || [])
     } catch (err) {
       setLoadError(err.message || 'Failed to load orders from server.')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [coupon])
 
   useEffect(() => {
     fetchOrders()
@@ -649,17 +653,22 @@ function Orders() {
       .filter((order) => (status === 'all' ? true : order.status === status))
       .filter((order) => (payment === 'all' ? true : order.paymentStatus === payment))
       .filter((order) => matchesDateFilter(order.date, date, from, to))
-  }, [orders, query, status, payment, date, from, to])
+      .filter((order) =>
+        coupon
+          ? String(order.coupon?.code || '').toUpperCase() === coupon
+          : true,
+      )
+  }, [orders, query, status, payment, date, from, to, coupon])
 
   const paged = usePagedList(
     filtered,
     ADMIN_PAGE_SIZE,
-    `${query}|${status}|${payment}|${date}|${from}|${to}|${filtered.length}`,
+    `${query}|${status}|${payment}|${date}|${from}|${to}|${coupon}|${filtered.length}`,
   )
 
   useEffect(() => {
     setMenuId(null)
-  }, [paged.page, query, status, payment, date, from, to])
+  }, [paged.page, query, status, payment, date, from, to, coupon])
 
   function openOrder(order) {
     setSelectedId(order.id)
@@ -760,6 +769,15 @@ function Orders() {
             value={query}
             onChange={(event) => set('q', event.target.value)}
             placeholder="Search order or customer"
+          />
+        </label>
+        <label className="admin-orders__select">
+          <span>Coupon</span>
+          <input
+            value={coupon}
+            onChange={(event) => set('coupon', event.target.value.toUpperCase())}
+            placeholder="Code"
+            aria-label="Filter by coupon code"
           />
         </label>
         <label className="admin-orders__select">

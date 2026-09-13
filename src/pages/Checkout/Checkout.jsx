@@ -138,7 +138,15 @@ function StepHead({ step, mobileStep, title, mobileTitle }) {
 }
 
 function Checkout() {
-  const { items, clearCart, loading: cartLoading } = useCart()
+  const {
+    items,
+    clearCart,
+    loading: cartLoading,
+    subtotal: cartSubtotal,
+    discountAmount,
+    appliedCoupon,
+    syncCart,
+  } = useCart()
   const { user } = useAuth()
   const navigate = useNavigate()
   const [form, setForm] = useState(emptyForm)
@@ -220,10 +228,11 @@ function Checkout() {
 
   const shipping = form.delivery === 'express' ? EXPRESS : STANDARD
   const subtotal = useMemo(
-    () => items.reduce((sum, item) => sum + item.price * item.quantity, 0),
-    [items],
+    () => (cartSubtotal > 0 ? cartSubtotal : items.reduce((sum, item) => sum + item.price * item.quantity, 0)),
+    [cartSubtotal, items],
   )
-  const total = subtotal + shipping
+  const discount = discountAmount > 0 ? discountAmount : 0
+  const total = Math.max(0, subtotal + shipping - discount)
 
   function setValue(key, value) {
     setForm((current) => ({ ...current, [key]: value }))
@@ -429,6 +438,7 @@ function Checkout() {
 
       const orderPayload = {
         shippingMethod: form.delivery === 'express' ? 'express' : 'standard',
+        ...(appliedCoupon?.code ? { couponCode: appliedCoupon.code } : {}),
         ...(isSaved
           ? { addressId: activeAddress.id }
           : {
@@ -447,6 +457,13 @@ function Checkout() {
                 longitude: activeAddress.longitude ?? null,
               },
             }),
+      }
+
+      // Refresh cart quote so checkout breakdown matches backend before place-order
+      try {
+        await syncCart()
+      } catch {
+        /* proceed; server will revalidate coupon on createOrder */
       }
 
       // 1. Create authoritative SV Hub Order in MongoDB (status: PENDING_PAYMENT)
@@ -631,6 +648,12 @@ function Checkout() {
           <dt>Subtotal</dt>
           <dd>{formatPrice(subtotal)}</dd>
         </div>
+        {discount > 0 ? (
+          <div>
+            <dt>Discount{appliedCoupon?.code ? ` (${appliedCoupon.code})` : ''}</dt>
+            <dd>−{formatPrice(discount)}</dd>
+          </div>
+        ) : null}
         <div>
           <dt>Shipping</dt>
           <dd>{formatPrice(shipping)}</dd>

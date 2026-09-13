@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { onAuthStateChanged } from 'firebase/auth'
 import * as authApi from '../api/auth.js'
+import { SESSION_INVALID_EVENT } from '../api/client.js'
 import { getFirebaseAuth } from '../lib/firebase.js'
 import { mapFirebaseError, signInWithGooglePopup, signOutFirebase } from '../lib/googleAuth.js'
 const AuthContext = createContext(null)
@@ -65,6 +66,21 @@ export function AuthProvider({ children }) {
     } catch {
       // Local session is already cleared.
     }
+  }, [])
+
+  useEffect(() => {
+    const onSessionInvalid = () => {
+      exchanging.current = true
+      authApi.logout()
+      setUser(null)
+      signOutFirebase()
+        .catch(() => {})
+        .finally(() => {
+          exchanging.current = false
+        })
+    }
+    window.addEventListener(SESSION_INVALID_EVENT, onSessionInvalid)
+    return () => window.removeEventListener(SESSION_INVALID_EVENT, onSessionInvalid)
   }, [])
 
   useEffect(() => {

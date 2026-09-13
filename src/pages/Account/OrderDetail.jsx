@@ -151,6 +151,7 @@ function OrderDetail() {
           subtotal: raw.subtotal,
           shippingFee: raw.shippingFee,
           discount: raw.discount,
+          coupon: raw.coupon || null,
           address: raw.shippingAddress,
           courier: raw.courier || null,
           trackingUrl: raw.trackingUrl || null,
@@ -461,7 +462,10 @@ function OrderDetail() {
                 <dd>{order.shippingFee ? formatPrice(order.shippingFee) : 'Free'}</dd>
               </div>
               <div>
-                <dt>Discount</dt>
+                <dt>
+                  Discount
+                  {order.coupon?.code ? ` (${order.coupon.code})` : ''}
+                </dt>
                 <dd>{order.discount ? `− ${formatPrice(order.discount)}` : formatPrice(0)}</dd>
               </div>
               <div className="od-summary__total">

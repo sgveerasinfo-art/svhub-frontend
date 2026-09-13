@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { AuthError } from '../../api/auth.js'
+import { AuthError, readToken } from '../../api/auth.js'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { AdminButton, FormField } from '../../components/admin/ui.jsx'
 import { Icon } from '../../components/admin/icons.jsx'
@@ -31,11 +31,20 @@ function AdminLogin() {
   useEffect(() => {
     document.documentElement.classList.add('admin-open')
     clearAdminLocalState()
+    try {
+      const notice = window.sessionStorage.getItem('svhub.auth.notice')
+      if (notice) {
+        window.sessionStorage.removeItem('svhub.auth.notice')
+        setFormError(notice)
+      }
+    } catch {
+      /* ignore */
+    }
     return () => document.documentElement.classList.remove('admin-open')
   }, [])
 
   useEffect(() => {
-    if (hasAdminAccess(user)) {
+    if (hasAdminAccess(user) && readToken()) {
       navigate(from, { replace: true })
     }
   }, [user, from, navigate])

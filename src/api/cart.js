@@ -65,3 +65,28 @@ export async function mergeCart(items) {
     auth: true,
   })
 }
+
+/**
+ * Apply a coupon code to the authenticated cart.
+ * @param {string} code
+ */
+export async function applyCartCoupon(code) {
+  return apiFetch('/cart/coupon', {
+    method: 'POST',
+    body: { code },
+    auth: true,
+  })
+}
+
+/** Remove the applied coupon from the cart. */
+export async function removeCartCoupon() {
+  return apiFetch('/cart/coupon', {
+    method: 'DELETE',
+    auth: true,
+  })
+}
+
+/** List coupons currently eligible for this cart. */
+export async function getAvailableCartCoupons() {
+  return apiFetch('/cart/coupons/available', { auth: true })
+}

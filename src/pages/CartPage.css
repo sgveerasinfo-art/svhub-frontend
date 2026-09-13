@@ -365,7 +365,62 @@
 }
 
 .cart-promo {
-  display: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.cart-promo input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  border-bottom: 1px solid rgba(197, 200, 181, 0.5);
+  border-radius: 0;
+  background: transparent;
+  padding: 8px 0;
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--cart-on);
+}
+
+.cart-promo input::placeholder {
+  color: var(--cart-outline);
+}
+
+.cart-promo input:focus {
+  outline: none;
+  border-bottom-color: var(--cart-primary);
+}
+
+.cart-promo button {
+  border: 0;
+  background: transparent;
+  padding: 8px;
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--cart-primary);
+  cursor: pointer;
+}
+
+.cart-promo button:hover {
+  color: var(--cart-primary-hover);
+}
+
+.cart-promo--applied {
+  justify-content: space-between;
+  font-size: 14px;
+  color: var(--cart-on);
+}
+
+.cart-promo__msg {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--cart-outline);
 }
 
 .cart-summary__total {

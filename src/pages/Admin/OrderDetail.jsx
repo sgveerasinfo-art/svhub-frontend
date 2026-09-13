@@ -524,7 +524,10 @@ function OrderDetailContent({ order, onOrderUpdated, toast }) {
                 </div>
                 {order.discount > 0 && (
                   <div className="is-discount">
-                    <dt>Discount</dt>
+                    <dt>
+                      Discount
+                      {order.coupon?.code ? ` (${order.coupon.code})` : ''}
+                    </dt>
                     <dd>-<Money value={order.discount} /></dd>
                   </div>
                 )}

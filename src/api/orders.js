@@ -13,10 +13,22 @@ import { apiFetch } from './client.js'
  * @param {string} [options.shippingMethod]  - 'standard' | 'express'
  * @param {string} [options.notes]           - Optional order notes
  */
-export async function createOrder({ addressId, shippingAddress, shippingMethod = 'standard', notes = '' } = {}) {
+export async function createOrder({
+  addressId,
+  shippingAddress,
+  shippingMethod = 'standard',
+  notes = '',
+  couponCode,
+} = {}) {
   return apiFetch('/orders', {
     method: 'POST',
-    body: { addressId, shippingAddress, shippingMethod, notes },
+    body: {
+      addressId,
+      shippingAddress,
+      shippingMethod,
+      notes,
+      ...(couponCode ? { couponCode } : {}),
+    },
     auth: true,
   })
 }

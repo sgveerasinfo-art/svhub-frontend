@@ -9,7 +9,13 @@ export default function RequireAdmin() {
   const token = readToken()
 
   if (!token || !user || !hasAdminAccess(user)) {
-    return <Navigate to="/admin/login" replace state={{ from: `${location.pathname}${location.search}` }} />
+    return (
+      <Navigate
+        to="/admin/login"
+        replace
+        state={{ from: `${location.pathname}${location.search}` }}
+      />
+    )
   }
 
   return <Outlet />

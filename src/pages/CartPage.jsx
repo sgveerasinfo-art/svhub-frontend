@@ -256,14 +256,44 @@ function RelatedCard({ product, onAdd }) {
 }
 
 function CartPage() {
-  const { items, count, subtotal: cartSubtotal, addItem, setItemQuantity, adjustItemQuantity, cartError, clearCartError } = useCart()
+  const {
+    items,
+    count,
+    subtotal: cartSubtotal,
+    discountedSubtotal,
+    discountAmount,
+    appliedCoupon,
+    couponMessage,
+    applyCoupon,
+    removeCoupon,
+    addItem,
+    setItemQuantity,
+    adjustItemQuantity,
+    cartError,
+    clearCartError,
+  } = useCart()
   const { user } = useAuth()
   const navigate = useNavigate()
   const [promo, setPromo] = useState('')
+  const [promoBusy, setPromoBusy] = useState(false)
   const [itemPendingRemoval, setItemPendingRemoval] = useState(null)
   const [showLoginModal, setShowLoginModal] = useState(false)
   const subtotal = cartSubtotal
+  const total = discountAmount > 0 ? discountedSubtotal : subtotal
   const [featuredList, setFeaturedList] = useState([])
+
+  async function handleApplyPromo(event) {
+    event.preventDefault()
+    setPromoBusy(true)
+    try {
+      await applyCoupon(promo)
+      setPromo('')
+    } catch {
+      /* message via couponMessage */
+    } finally {
+      setPromoBusy(false)
+    }
+  }
 
   function handleProceedToCheckout() {
     if (!user) {
@@ -354,6 +384,12 @@ function CartPage() {
                     <dt>Subtotal ({count} {count === 1 ? 'item' : 'items'})</dt>
                     <dd>{formatPrice(subtotal)}</dd>
                   </div>
+                  {discountAmount > 0 ? (
+                    <div>
+                      <dt>Discount{appliedCoupon?.code ? ` (${appliedCoupon.code})` : ''}</dt>
+                      <dd>−{formatPrice(discountAmount)}</dd>
+                    </div>
+                  ) : null}
                   <div>
                     <dt>
                       <span className="cart-summary__desk">Shipping</span>
@@ -367,27 +403,42 @@ function CartPage() {
                   </div>
                 </dl>
 
-                <form
-                  className="cart-promo"
-                  onSubmit={(event) => {
-                    event.preventDefault()
-                  }}
-                >
-                  <input
-                    type="text"
-                    name="promo"
-                    aria-label="Promo code"
-                    placeholder="Promo code"
-                    value={promo}
-                    onChange={(event) => setPromo(event.target.value)}
-                    autoComplete="off"
-                  />
-                  <button type="submit">Apply</button>
-                </form>
+                {appliedCoupon?.code ? (
+                  <div className="cart-promo cart-promo--applied">
+                    <span>
+                      Applied: <strong>{appliedCoupon.code}</strong>
+                      {appliedCoupon.pending ? ' (sign in to validate)' : null}
+                    </span>
+                    <button type="button" onClick={() => removeCoupon()} disabled={promoBusy}>
+                      Remove
+                    </button>
+                  </div>
+                ) : (
+                  <form className="cart-promo" onSubmit={handleApplyPromo}>
+                    <input
+                      type="text"
+                      name="promo"
+                      aria-label="Promo code"
+                      placeholder="Promo code"
+                      value={promo}
+                      onChange={(event) => setPromo(event.target.value)}
+                      autoComplete="off"
+                      disabled={promoBusy}
+                    />
+                    <button type="submit" disabled={promoBusy || !promo.trim()}>
+                      {promoBusy ? '…' : 'Apply'}
+                    </button>
+                  </form>
+                )}
+                {couponMessage ? (
+                  <p className="cart-promo__msg" role="status">
+                    {couponMessage}
+                  </p>
+                ) : null}
 
                 <div className="cart-summary__total">
                   <span>Total</span>
-                  <strong>{formatPrice(subtotal)}</strong>
+                  <strong>{formatPrice(total)}</strong>
                 </div>
 
                 <button

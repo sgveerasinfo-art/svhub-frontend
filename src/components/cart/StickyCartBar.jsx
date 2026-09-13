@@ -35,7 +35,7 @@ function ArrowRight() {
 }
 
 export default function StickyCartBar() {
-  const { count, subtotal, cartError, clearCartError } = useCart()
+  const { count, subtotal, discountedSubtotal, discountAmount, cartError, clearCartError } = useCart()
   const [isExiting, setIsExiting] = useState(false)
   const [isVisible, setIsVisible] = useState(count > 0)
   const [pulse, setPulse] = useState(false)
@@ -78,7 +78,8 @@ export default function StickyCartBar() {
   if (!shouldRender) return null
 
   const itemText = count === 1 ? '1 ITEM' : `${count} ITEMS`
-  const formattedTotal = formatPrice(subtotal)
+  const displayTotal = discountAmount > 0 ? discountedSubtotal : subtotal
+  const formattedTotal = formatPrice(displayTotal)
   const accessibleLabel = `Go to cart. ${count} ${count === 1 ? 'item' : 'items'}. Total ${formattedTotal}.`
 
   return (
