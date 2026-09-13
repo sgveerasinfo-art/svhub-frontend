@@ -149,6 +149,7 @@ export function getAccountOrders(user) {
   const extra = lastMatches && !recorded.some((order) => order.id === last.id) ? [last] : []
   const list = [...extra, ...recorded]
   return list
+}
 
 export function getAccountOrder(orderId, user) {
   const id = String(orderId || '').toLowerCase()
